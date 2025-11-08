@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Sign in — AI Fitness Planner</title>
+  <style>
+    :root{
+      --primary:#4361ee; --accent:#f72585; --light:#f8f9fa; --dark:#212529; --gray:#6c757d;
+    }
+    *{box-sizing:border-box;font-family:Segoe UI,Segoe,Arial,sans-serif}
+    body{margin:0;min-height:100vh;background:linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%);display:flex;align-items:center;justify-content:center;padding:24px;color:var(--dark)}
+    .card{width:100%;max-width:420px;background:#fff;border-radius:12px;padding:20px;box-shadow:0 10px 30px rgba(30,30,60,0.08)}
+    h1{font-size:1.25rem;margin:0 0 8px;color:var(--primary)}
+    p.lead{margin:0 0 16px;color:var(--gray)}
+    label{display:block;font-weight:600;margin-top:10px;color:var(--primary)}
+    input[type="email"],input[type="password"]{width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;margin-top:6px}
+    .actions{display:flex;gap:8px;margin-top:14px;align-items:center}
+    .btn{padding:10px 14px;border-radius:8px;font-weight:700;border:none;cursor:pointer}
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-ghost{background:transparent;border:1px solid #ddd}
+    .msg{margin-top:12px;padding:8px;border-radius:8px}
+    .err{background:#f8d7da;color:#721c24}
+    .ok{background:#d1fae5;color:#064e3b}
+    .top-links{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .small{font-size:0.9rem;color:var(--gray)}
+    .hint{font-size:0.9rem;color:var(--gray);margin-top:8px}
+    .center{display:flex;justify-content:center}
+  </style>
+</head>
+<body>
+  <div class="card" role="main" aria-labelledby="signin-title">
+    <div class="top-links">
+      <div>
+        <strong>AI Fitness Planner</strong>
+      </div>
+      <div class="small"><a href="dashboard.html">Home</a></div>
+    </div>
+
+    <h1 id="signin-title">Sign in</h1>
+    <p class="lead">Sign in to access your personalized workout & meal plans.</p>
+
+    <form id="login-form" autocomplete="on">
+      <label for="email">Email</label>
+      <input id="email" type="email" required placeholder="you@example.com" />
+      <label for="password">Password</label>
+      <input id="password" type="password" required placeholder="Your password" />
+      <div class="actions">
+        <button type="submit" class="btn btn-primary" id="submit-btn">Sign in</button>
+        <button type="button" id="fill-test" class="btn btn-ghost">Fill Test</button>
+      </div>
+      <div id="message" class="msg" style="display:none"></div>
+      <p class="hint">Don't have an account? Ask the admin to create one, or use the seeded test account.</p>
+    </form>
+
+    <div style="margin-top:12px;font-size:0.85rem;color:var(--gray);text-align:center">
+      <small>This page talks to the backend to authenticate. Make sure the backend URL is configured correctly.</small>
+    </div>
+  </div>
+
+  <script>
+    // ---------- configuration ----------
+    const PUBLIC_BACKEND_URL = 'https://your-backend-service.example'; // <-- REPLACE this with your public backend URL
+    const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const API_BASE_URL = isLocalhost ? 'http://localhost:8000' : PUBLIC_BACKEND_URL;
+
+    // ---------- helpers ----------
+    const form = document.getElementById('login-form');
+    const emailEl = document.getElementById('email');
+    const passEl = document.getElementById('password');
+    const submitBtn = document.getElementById('submit-btn');
+    const fillBtn = document.getElementById('fill-test');
+    const msgEl = document.getElementById('message');
+
+    function showMessage(text, type='error'){
+      msgEl.style.display = 'block';
+      msgEl.textContent = text;
+      msgEl.className = 'msg ' + (type==='ok' ? 'ok' : 'err');
+    }
+
+    function clearMessage(){ msgEl.style.display = 'none'; msgEl.textContent = ''; }
+
+    fillBtn.addEventListener('click', ()=>{ emailEl.value = 'test@example.com'; passEl.value = 'TestPassword123'; });
+
+    form.addEventListener('submit', async (ev)=>{
+      ev.preventDefault();
+      clearMessage();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Signing in...';
+
+      const payload = { email: emailEl.value.trim(), password: passEl.value };
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          credentials: 'omit'
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({error:res.statusText}));
+          showMessage(err.error || err.message || 'Login failed', 'error');
+          return;
+        }
+
+        const data = await res.json();
+        // expected response shape: { token: '...', user: { id, email, name } }
+        if (!data || !data.token) {
+          showMessage('Invalid response from server', 'error');
+          return;
+        }
+
+        // Save token & user
+        localStorage.setItem('afp_token', data.token);
+        localStorage.setItem('afp_user', JSON.stringify(data.user || {}));
+        showMessage('Signed in — redirecting...', 'ok');
+
+        // redirect to main app
+        setTimeout(()=> window.location.href = 'index.html', 700);
+      } catch (err) {
+        console.error(err);
+        showMessage('Network error — check backend URL and CORS', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign in';
+      }
+    });
+
+    // if already logged in, go to app
+    (function(){
+      try {
+        const t = localStorage.getItem('afp_token');
+        if (t) { window.location.href = 'index.html'; }
+      } catch {}
+    })();
+  </script>
+</body>
+</html>
