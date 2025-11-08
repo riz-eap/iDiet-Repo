@@ -86,11 +86,12 @@
     async function tryLoginPath(path, payload){
       const url = (API_BASE_URL.replace(/\/$/, '') + path);
       try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ email, password }),
+});
+
 
         // If 404 or 405 or 401 etc, return status for caller to decide
         const contentType = res.headers.get('content-type') || '';
