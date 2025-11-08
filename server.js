@@ -94,47 +94,49 @@ async function queryDb(text, params) {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body ?? {};
+    console.log('[DEBUG] login attempt received. email=', JSON.stringify(email));
+
     if (!email || !password) {
+      console.log('[DEBUG] missing email or password in request body.');
       return res.status(400).json({ error: 'Email and password required' });
     }
 
-    // Query user by email
+    // Query DB for user
     const q = await queryDb('SELECT id, name, email, password, password_hash FROM users WHERE email = $1 LIMIT 1', [email]);
     const userRow = q.rows[0];
 
     if (!userRow) {
+      console.log('[DEBUG] NO USER FOUND for email=', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Determine which column holds the bcrypt hash
+    console.log('[DEBUG] userRow found:', { id: userRow.id, email: userRow.email, has_password: !!userRow.password, has_password_hash: !!userRow.password_hash });
+
+    // Choose hash column
     const hash = userRow.password || userRow.password_hash;
     if (!hash) {
-      // no password stored
+      console.log('[DEBUG] user has no password hash stored');
       return res.status(500).json({ error: 'No password hash stored for user' });
     }
 
+    // Compare
     const match = await bcrypt.compare(password, hash);
+    console.log('[DEBUG] bcrypt.compare result for', email, ':', match);
+
     if (!match) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Build user object to return (omit sensitive fields)
-    const user = {
-      id: userRow.id,
-      name: userRow.name,
-      email: userRow.email
-    };
-
-    // Sign JWT (valid for 7 days)
+    // success: sign token
+    const user = { id: userRow.id, name: userRow.name, email: userRow.email };
     const token = jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-
+    console.log('[DEBUG] login success for', email, '-> userId:', user.id);
     return res.json({ token, user });
   } catch (err) {
-    console.error('Login error:', err);
+    console.error('[ERROR] /api/auth/login debug handler', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
-
 // ---------- Middleware: simple auth for protected routes ----------
 function authMiddleware(req, res, next) {
   const auth = req.headers.authorization;
