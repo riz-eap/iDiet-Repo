@@ -5,16 +5,31 @@ import ApiStatus from './components/ApiStatus';
 import { WorkoutPlan, MealPlan } from './components/PlanCard';
 import Spinner from './components/Spinner';
 import { api } from './services/api';
+import Login from './components/Login';
 
+/**
+ * Top-level App
+ * - Shows login screen if not authenticated
+ * - Otherwise, shows the dashboard and plan UI
+ */
 export default function App() {
-  // App state
+  // Auth state: user object and token presence
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('afp_user') || 'null');
+    } catch {
+      return null;
+    }
+  });
+
+  // Plans & UI state
   const [workout, setWorkout] = useState(null);
   const [meal, setMeal] = useState(null);
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [loadingMeal, setLoadingMeal] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
 
-  // Fetch workout plan
+  // Fetchers
   const fetchWorkout = useCallback(async () => {
     setLoadingWorkout(true);
     try {
@@ -29,7 +44,6 @@ export default function App() {
     }
   }, []);
 
-  // Fetch meal plan
   const fetchMeal = useCallback(async () => {
     setLoadingMeal(true);
     try {
@@ -44,11 +58,11 @@ export default function App() {
     }
   }, []);
 
-  // Initialize: load plans and listen for generate-plan events
+  // Initialize and add event listener for generate-plan
   useEffect(() => {
     let mounted = true;
+
     (async () => {
-      // only set states when component is still mounted
       if (!mounted) return;
       await fetchWorkout();
       await fetchMeal();
@@ -58,23 +72,22 @@ export default function App() {
       handleGenerate();
     }
     window.addEventListener('generate-plan', onGenerate);
-
     return () => {
       mounted = false;
       window.removeEventListener('generate-plan', onGenerate);
     };
   }, [fetchMeal, fetchWorkout]);
 
-  // Handle generating new plan (calls backend then refreshes plans)
+  // Generate plan (sends profile to backend, then refreshes display)
   async function handleGenerate() {
     const local = localStorage.getItem('afp_profile');
-    const user = local
+    const profile = local
       ? JSON.parse(local)
       : { age: 28, weight: 70, height: 175, gender: 'male', goal: 'lose_weight', activityLevel: 'moderate' };
 
     try {
       setStatusMessage('Generating plan...');
-      await api.generatePlan(user);
+      await api.generatePlan(profile);
       setStatusMessage('Plan generated successfully');
       await fetchWorkout();
       await fetchMeal();
@@ -84,7 +97,7 @@ export default function App() {
     }
   }
 
-  // Download both plans as a JSON file
+  // Export combined plan as JSON
   function exportPlan() {
     const blob = new Blob([JSON.stringify({ workout, meal }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -95,6 +108,56 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  // Login handler (called by Login component)
+  async function handleLogin(userObj) {
+    // userObj comes from Login.jsx which stores token + user to localStorage;
+    // we just sync local state here
+    try {
+      setUser(userObj);
+      setStatusMessage('Signed in');
+      // Refresh plans (authenticated)
+      await fetchWorkout();
+      await fetchMeal();
+    } catch (e) {
+      console.error('handleLogin error', e);
+    }
+  }
+
+  // Logout handler
+  function logout() {
+    localStorage.removeItem('afp_token');
+    localStorage.removeItem('afp_user');
+    setUser(null);
+    setStatusMessage('Signed out');
+  }
+
+  // If not authenticated, show Login
+  if (!user) {
+    return (
+      <div className="container">
+        <header className="header">
+          <h1>AI Fitness Planner</h1>
+          <p className="small">Sign in to access your personalized plans</p>
+        </header>
+
+        <div style={{ maxWidth: 520, margin: '0 auto', marginTop: 24 }}>
+          <Login onLogin={async (u) => {
+            // Login component stores token and user in localStorage; here we read it back
+            try {
+              const storedUser = JSON.parse(localStorage.getItem('afp_user') || 'null');
+              handleLogin(storedUser || u);
+            } catch {
+              handleLogin(u);
+            }
+          }} />
+        </div>
+
+        <footer className="footer">AI Fitness Planner Demo • Backend: Node.js + Express • Frontend: React</footer>
+      </div>
+    );
+  }
+
+  // Authenticated UI
   return (
     <div className="container">
       <header className="header">
@@ -106,8 +169,16 @@ export default function App() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem', marginTop: '1rem' }}>
         <div style={{ display: 'grid', gap: '0.7rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontWeight: 700 }}>Welcome, {user.name || user.email}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn" onClick={logout}>Logout</button>
+            </div>
+          </div>
+
           <ProfileCard onProfileSaved={() => setStatusMessage('Profile saved')} setStatusMessage={setStatusMessage} />
           <ApiStatus />
+
           <div className="card">
             <div className="card-header"><h3>Quick Actions</h3></div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -122,9 +193,7 @@ export default function App() {
               >
                 Refresh Plans
               </button>
-              <button className="btn btn-success" onClick={exportPlan}>
-                Download Plan
-              </button>
+              <button className="btn btn-success" onClick={exportPlan}>Download Plan</button>
             </div>
           </div>
 
