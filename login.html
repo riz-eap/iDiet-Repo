@@ -1,15 +1,15 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>AI Fitness Planner — Login</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Fitness Planner — Login (Bypass)</title>
   <style>
-    :root{--primary:#4361ee;--accent:#f72585;--light:#f8f9fa;--dark:#212529;--gray:#6c757d}
+    :root{--primary:#4361ee;--accent:#f72585;--light:#f8f9fa;--dark:#212529;--gray:#adb5bd}
     *{box-sizing:border-box;font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif}
-    body{margin:0;min-height:100vh;background:linear-gradient(135deg,#f5f7fa,#c3cfe2);display:flex;align-items:center;justify-content:center;padding:24px;color:var(--dark)}
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#f5f7fa,#c3cfe2);color:var(--dark)}
     .card{width:100%;max-width:480px;background:#fff;border-radius:12px;padding:20px;box-shadow:0 10px 30px rgba(30,30,60,0.08)}
-    h1{color:var(--primary);margin:0 0 8px}
+    h1{color:var(--primary);margin:0 0 10px}
     label{display:block;font-weight:600;margin-top:10px;color:var(--primary)}
     input{width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;margin-top:6px}
     .actions{display:flex;gap:8px;margin-top:14px;align-items:center}
@@ -19,22 +19,20 @@
     .msg{margin-top:12px;padding:10px;border-radius:8px}
     .err{background:#fee2e2;color:#b91c1c}
     .ok{background:#ddf7ea;color:#065f46}
-    .info{background:#eef2ff;color:#1e3a8a}
-    .server-html{margin-top:12px;padding:10px;border-radius:8px;background:#fff;border:1px solid #eee;max-height:240px;overflow:auto;font-family:monospace;font-size:13px}
     small{display:block;margin-top:10px;color:var(--gray)}
   </style>
 </head>
 <body>
   <div class="card" role="main">
-    <h1>Sign in</h1>
-    <p style="margin:6px 0 14px;color:var(--gray)">Use the test account or your real account. The script will try common login endpoints automatically.</p>
+    <h1>Sign in — AI Fitness Planner</h1>
+    <p style="margin:6px 0 14px;color:var(--gray)">This page is temporarily wired to a test bypass endpoint for quick frontend testing.</p>
 
     <form id="loginForm" autocomplete="on">
       <label for="email">Email</label>
-      <input id="email" type="email" required placeholder="test@example.com" value="test@example.com"/>
+      <input id="email" type="email" required placeholder="test@example.com" value="test@example.com" />
 
       <label for="password">Password</label>
-      <input id="password" type="password" required placeholder="TestPassword123" value="TestPassword123"/>
+      <input id="password" type="password" required placeholder="TestPassword123" value="TestPassword123" />
 
       <div class="actions">
         <button class="btn btn-primary" type="submit" id="btnSubmit">Sign in</button>
@@ -42,165 +40,94 @@
       </div>
 
       <div id="message" class="msg" style="display:none"></div>
-      <div id="serverHtml" class="server-html" style="display:none"></div>
-
       <small>Test account: <strong>test@example.com</strong> / <strong>TestPassword123</strong></small>
     </form>
   </div>
 
   <script>
-    // ----------------- CONFIGURE THIS -----------------
-    const API_BASE_URL = "https://idiet-repo.onrender.com"; // <- keep this (your Render URL) or change to http://localhost:8000
-    // -------------------------------------------------
-
-    // Candidate auth paths - we'll try each until one responds 200 & JSON
-    const candidatePaths = [
-      "/api/auth/login",
-      "/auth/login",
-      "/api/login",
-      "/login"
-    ];
+    // ⚙️ Set your backend base URL here
+    const API_BASE_URL = "https://idiet-repo.onrender.com"; // keep this for Render, or use "http://localhost:8000" to test locally
 
     const form = document.getElementById('loginForm');
     const btn = document.getElementById('btnSubmit');
     const btnClear = document.getElementById('btnClear');
     const msg = document.getElementById('message');
-    const serverHtml = document.getElementById('serverHtml');
 
-    function showMessage(text, type='err'){
+    function showMessage(text, type='err') {
       msg.style.display = 'block';
       msg.textContent = text;
-      msg.className = 'msg ' + (type==='ok' ? 'ok' : type==='info' ? 'info' : 'err');
+      msg.className = 'msg ' + (type === 'ok' ? 'ok' : 'err');
     }
-    function hideMessage(){ msg.style.display='none'; msg.textContent=''; msg.className='msg'; }
-    function showServerHtml(html){ serverHtml.style.display='block'; serverHtml.textContent = html; }
-    function hideServerHtml(){ serverHtml.style.display='none'; serverHtml.textContent=''; }
+    function hideMessage() { msg.style.display = 'none'; msg.textContent = ''; msg.className = 'msg'; }
 
-    btnClear.addEventListener('click', ()=>{
+    btnClear.addEventListener('click', () => {
       document.getElementById('email').value = '';
       document.getElementById('password').value = '';
       hideMessage();
-      hideServerHtml();
     });
 
-    async function tryLoginPath(path, payload){
-      const url = (API_BASE_URL.replace(/\/$/, '') + path);
-      try {
-        // TEMP: use bypass endpoint for debugging (remove when done)
-const res = await fetch(`${API_BASE_URL}/api/auth/login-test-bypass`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ email, password }),
-});
-
-
-
-        // If 404 or 405 or 401 etc, return status for caller to decide
-        const contentType = res.headers.get('content-type') || '';
-        const text = await res.text(); // read text always
-
-        // If JSON, parse it. If not, return the plain text (likely HTML)
-        const isJson = contentType.includes('application/json') || (text && text.trim().startsWith('{'));
-        let parsed = null;
-        if (isJson) {
-          try { parsed = JSON.parse(text); } catch(e){ parsed = null; }
-        }
-
-        return { status: res.status, ok: res.ok, json: parsed, text, url };
-      } catch (err) {
-        // network error (DNS, CORS preflight blocked, offline)
-        return { error: err.message || String(err), url };
-      }
-    }
-
-    form.addEventListener('submit', async (ev)=>{
-      ev.preventDefault();
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
       hideMessage();
-      hideServerHtml();
 
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
 
-      if (!email || !password) { showMessage('Fill both email and password'); return; }
+      if (!email || !password) { showMessage('Please enter both email and password'); return; }
 
       btn.disabled = true;
-      btn.textContent = 'Trying...';
+      btn.textContent = 'Signing in...';
 
-      const payload = { email, password };
+      try {
+        // TEMPORARY BYPASS: posts to login-test-bypass on the server
+        const res = await fetch(`${API_BASE_URL}/api/auth/login-test-bypass`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
 
-      // Try candidate paths in order
-      let lastError = null;
-      for (const p of candidatePaths) {
-        showMessage('Trying ' + p + ' ...', 'info');
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch (err) { data = null; }
 
-        const result = await tryLoginPath(p, payload);
-
-        // Network-level error (DNS / CORS / connection)
-        if (result.error) {
-          lastError = `Network error calling ${result.url}: ${result.error}`;
-          console.warn(lastError);
-          // keep trying other paths because DNS is same host, so network error will repeat — break early
-          showMessage(lastError, 'err');
-          break;
-        }
-
-        // Got an HTTP response
-        console.log('tried', result.url, 'status', result.status, 'json?', !!result.json);
-        if (result.ok && result.json && result.json.token) {
-          // success
-          localStorage.setItem('afp_token', result.json.token);
-          localStorage.setItem('afp_user', JSON.stringify(result.json.user || {}));
-          showMessage('Login successful — redirecting...', 'ok');
-          btn.textContent = 'Success';
-          setTimeout(()=> window.location.href = 'dashboard.html', 900);
+        if (!res.ok) {
+          // If server returned JSON error, show it; otherwise show raw body
+          const errMsg = data?.error || text || `Server responded ${res.status}`;
+          showMessage(errMsg);
+          btn.disabled = false;
+          btn.textContent = 'Sign in';
           return;
         }
 
-        // If ok but not JSON, show returned HTML/text (useful to debug)
-        if (result.ok && !result.json) {
-          showMessage(`Received non-JSON response (status ${result.status}) from ${result.url}. Showing response body below for debugging.`, 'err');
-          showServerHtml(result.text || '(empty body)');
-          lastError = `Non-JSON response at ${result.url}`;
-          break; // no point trying other endpoints if this host served HTML
+        // success: expect { token, user }
+        const token = data?.token || null;
+        const user = data?.user || null;
+
+        if (!token) {
+          showMessage('No token returned from server (check bypass route).');
+          btn.disabled = false;
+          btn.textContent = 'Sign in';
+          return;
         }
 
-        // If 404/405/401 — record and keep trying next path
-        if (!result.ok) {
-          lastError = `HTTP ${result.status} from ${result.url} (${result.text ? result.text.substring(0,200) : 'no body'})`;
-          console.warn(lastError);
-          // if 404, try next path
-          if (result.status === 404) {
-            continue;
-          }
-          // if 401 Unauthorized, show message and stop
-          if (result.status === 401) {
-            const errMsg = result.json?.error || 'Unauthorized (401). Check credentials.';
-            showMessage(`Unauthorized: ${errMsg}`, 'err');
-            break;
-          }
-          // for other 4xx/5xx, show server body if present
-          showMessage(`Server responded ${result.status}. See server output below.`, 'err');
-          if (result.text) showServerHtml(result.text);
-          break;
-        }
-      } // end for
+        // Save token & user
+        localStorage.setItem('afp_token', token);
+        if (user) localStorage.setItem('afp_user', JSON.stringify(user));
 
-      if (lastError && !msg.textContent) showMessage(lastError, 'err');
+        showMessage('Login successful — redirecting...', 'ok');
+        btn.textContent = 'Success';
 
-      btn.disabled = false;
-      btn.textContent = 'Sign in';
+        setTimeout(() => {
+          // Redirect to dashboard (or index.html)
+          window.location.href = 'dashboard.html';
+        }, 800);
+      } catch (err) {
+        console.error('Login network error', err);
+        showMessage('Network error. Check backend URL or connection.');
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+      }
     });
-
-    // quick helper: show root HTML if API host is serving an HTML index page (helps debug)
-    (async ()=>{
-      try {
-        const r = await fetch(API_BASE_URL + '/', { method:'GET' });
-        const ct = r.headers.get('content-type')||'';
-        if (r.ok && ct.includes('text/html')) {
-          console.info('Root is HTML — server might be serving static site or missing API routes.');
-        }
-      } catch(e){}
-    })();
   </script>
 </body>
 </html>
