@@ -1,6 +1,12 @@
 // server.js
 import express from 'express';
 import cors from 'cors';
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://127.0.0.1:5500', 'https://<your-github-username>.github.io', 'https://<your-frontend-host>']
+}));
+// For quick testing only (less secure):
+// app.use(cors());
+
 
 const app = express();
 app.use(cors());
