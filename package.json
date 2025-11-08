@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "main": "src/server.js",
+  "homepage": "https://riz-eap.github.io/iDiet-Repo/"
+
   "scripts": {
     "dev": "node --watch src/server.js",
     "build": "prisma generate",
