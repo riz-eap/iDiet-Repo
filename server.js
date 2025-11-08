@@ -2,7 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:5500', 'https://<your-github-username>.github.io', 'https://<your-frontend-host>']
+  origin: ['http://localhost:3000', 'http://127.0.0.1:5500', 'https://riz-eap.github.io/iDiet-Repo/', 'https://idiet-repo.onrender.com']
 }));
 // For quick testing only (less secure):
 // app.use(cors());
