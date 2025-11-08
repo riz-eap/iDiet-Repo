@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Fitness Planner | Demo</title>
+  <style>
+    /* ========== Theme Colors ========== */
+    :root {
+      --primary: #4361ee;
+      --secondary: #3a0ca3;
+      --accent: #f72585;
+      --light: #f8f9fa;
+      --dark: #212529;
+      --success: #4cc9f0;
+      --warning: #ffba08;
+      --danger: #f94144;
+      --gray: #adb5bd;
+    }
+
+    /* ========== Global Reset ========== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      padding: 20px;
+      line-height: 1.6;
+      color: var(--dark);
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* ========== Header ========== */
+    header {
+      text-align: center;
+      padding: 2rem 0;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 2.5rem;
+      color: var(--secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      font-size: 1.1rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .demo-banner {
+      background: var(--primary);
+      color: #fff;
+      text-align: center;
+      padding: 0.8rem;
+      border-radius: 6px;
+      margin-bottom: 2rem;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    /* ========== Layout ========== */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 900px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ========== Cards ========== */
+    .profile-card, 
+    .plan-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+      transition: transform 0.2s ease;
+    }
+
+    .profile-card:hover,
+    .plan-card:hover {
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--light);
+    }
+
+    .card-header h2 {
+      font-size: 1.3rem;
+      color: var(--secondary);
+    }
+
+    /* ========== Profile Form ========== */
+    .user-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .info-item {
+      margin-bottom: 1rem;
+    }
+
+    .info-item label {
+      display: block;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 0.4rem;
+    }
+
+    .info-item input, 
+    .info-item select {
+      width: 100%;
+      padding: 0.7rem;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      transition: all 0.2s ease;
+    }
+
+    .info-item input:focus, 
+    .info-item select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+    }
+
+    .input-with-unit {
+      position: relative;
+    }
+
+    .unit {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--gray);
+    }
+
+    /* ========== Buttons ========== */
+    .btn {
+      display: inline-block;
+      padding: 0.8rem 1.2rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-generate {
+      background: var(--accent);
+      color: #fff;
+      width: 100%;
+      margin-top: 1rem;
+      font-size: 1.05rem;
+    }
+
+    .btn-generate:hover {
+      background: #d81159;
+    }
+
+    .btn-save {
+      background: var(--success);
+      color: #fff;
+      margin-top: 0.5rem;
+    }
+
+    .btn-save:hover {
+      background: #3a9eb6;
+    }
+
+    /* ========== Content Styles ========== */
+    .exercise, .meal {
+      background: var(--light);
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+    }
+
+    .exercise h4, 
+    .meal h4 {
+      color: var(--secondary);
+      margin-bottom: 0.4rem;
+    }
+
+    .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+    }
+
+    .stat {
+      padding: 0.3rem 0.8rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border-radius: 20px;
+      background: #fff;
+    }
+
+    .stat-protein { color: #4361ee; border: 1px solid #4361ee; }
+    .stat-carbs   { color: #f94144; border: 1px solid #f94144; }
+    .stat-fats    { color: #f8961e; border: 1px solid #f8961e; }
+    .stat-calories{ color: #43aa8b; border: 1px solid #43aa8b; }
+
+    .placeholder {
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      color: var(--gray);
+      background: var(--light);
+      border-radius: 8px;
+      border: 2px dashed var(--gray);
+    }
+
+    .placeholder-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--primary);
+    }
+
+    /* ========== Messages ========== */
+    .success-message {
+      background: var(--success);
+      color: #fff;
+      padding: 10px;
+      text-align: center;
+      border-radius: 6px;
+      margin: 1rem 0;
+      animation: fadeOut 3s forwards;
+      animation-delay: 2s;
+    }
+
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to   { opacity: 0; display: none; }
+    }
+
+    /* ========== Footer ========== */
+    footer {
+      text-align: center;
+      margin-top: 2.5rem;
+      padding: 1rem;
+      color: var(--gray);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AI Fitness Planner</h1>
+      <p>Your personalized diet and workout recommendation system</p>
+    </header>
+
+    <div class="demo-banner">
+      Customize your profile and click "Generate Plan" to create your personalized workout and meal plan
+    </div>
+
+    <div class="dashboard">
+      <!-- Left Column -->
+      <div class="left-column">
+        <!-- Profile Card -->
+        <div class="profile-card">
+          <div class="card-header">
+            <h2>User Profile</h2>
+            <span class="edit-toggle" id="edit-toggle">✏️ Edit</span>
+          </div>
+          <div class="user-info">
+            <!-- Profile Fields -->
+            <div class="info-item">
+              <label>Age</label>
+              <input type="number" id="user-age" value="28" min="15" max="100" disabled>
+            </div>
+            <div class="info-item">
+              <label>Weight</label>
+              <div class="input-with-unit">
+                <input type="number" id="user-weight" value="70" step="0.1" disabled>
+                <span class="unit">kg</span>
+              </div>
+            </div>
+            <div class="info-item">
+              <label>Height</label>
+              <div class="input-with-unit">
+                <input type="number" id="user-height" value="175" disabled>
+                <span class="unit">cm</span>
+              </div>
+            </div>
+            <div class="info-item">
+              <label>Gender</label>
+              <select id="user-gender" disabled>
+                <option value="male" selected>Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="info-item">
+              <label>Goal</label>
+              <select id="user-goal" disabled>
+                <option value="lose_weight" selected>Lose Weight</option>
+                <option value="build_muscle">Build Muscle</option>
+                <option value="maintain">Maintain Weight</option>
+                <option value="improve_endurance">Improve Endurance</option>
+                <option value="get_toned">Get Toned</option>
+              </select>
+            </div>
+            <div class="info-item">
+              <label>Activity Level</label>
+              <select id="user-activity" disabled>
+                <option value="sedentary">Sedentary</option>
+                <option value="light">Light (1–3 days/week)</option>
+                <option value="moderate" selected>Moderate (3–5 days/week)</option>
+                <option value="active">Active (6–7 days/week)</option>
+                <option value="very_active">Very Active (daily)</option>
+              </select>
+            </div>
+          </div>
+          <div class="profile-actions">
+            <button class="btn btn-save hidden" id="save-btn">Save Changes</button>
+            <button class="btn btn-generate" id="generate-btn">Generate Plan</button>
+          </div>
+        </div>
+
+        <!-- API Status Card -->
+        <div class="profile-card">
+          <div class="card-header"><h2>API Status</h2></div>
+          <div class="user-info">
+            <div class="info-item">
+              <label>Backend</label>
+              <span id="backend-status">Checking...</span>
+            </div>
+            <div class="info-item">
+              <label>Endpoints</label>
+              <span id="endpoints-status">Checking...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div class="right-column">
+        <div class="plan-card">
+          <div class="card-header"><h2>Today's Workout Plan</h2></div>
+          <div id="workout-plan">
+            <div class="placeholder">
+              <div class="placeholder-icon">💪</div>
+              <p>Your personalized workout plan will appear here</p>
+              <small>Adjust profile and click "Generate Plan"</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-card">
+          <div class="card-header"><h2>Today's Meal Plan</h2></div>
+          <div id="meal-plan">
+            <div class="placeholder">
+              <div class="placeholder-icon">🍎</div>
+              <p>Your personalized meal plan will appear here</p>
+              <small>Adjust profile and click "Generate Plan"</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>AI Fitness Planner Demo • Backend: Node.js + Express • Frontend: HTML, CSS, JavaScript</p>
+    </footer>
+  </div>
+
+  <script>
+    const API_BASE_URL = 'http://localhost:8000';
+
+    // Elements
+    const generateBtn = document.getElementById('generate-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const editToggle = document.getElementById('edit-toggle');
+    const workoutPlanEl = document.getElementById('workout-plan');
+    const mealPlanEl = document.getElementById('meal-plan');
+    const backendStatusEl = document.getElementById('backend-status');
+    const endpointsStatusEl = document.getElementById('endpoints-status');
+
+    // Inputs
+    const ageInput = document.getElementById('user-age');
+    const weightInput = document.getElementById('user-weight');
+    const heightInput = document.getElementById('user-height');
+    const genderSelect = document.getElementById('user-gender');
+    const goalSelect = document.getElementById('user-goal');
+    const activitySelect = document.getElementById('user-activity');
+
+    let editMode = false;
+
+    /* ========== Profile Editing ========== */
+    editToggle.addEventListener('click', () => {
+      editMode = !editMode;
+      [ageInput, weightInput, heightInput, genderSelect, goalSelect, activitySelect]
+        .forEach(input => input.disabled = !editMode);
+
+      saveBtn.classList.toggle('hidden', !editMode);
+      editToggle.textContent = editMode ? '✖ Cancel' : '✏️ Edit';
+    });
+
+    saveBtn.addEventListener('click', () => {
+      const msg = document.createElement('div');
+      msg.classList.add('success-message');
+      msg.textContent = 'Profile updated successfully!';
+      document.querySelector('.demo-banner').after(msg);
+
+      editMode = false;
+      [ageInput, weightInput, heightInput, genderSelect, goalSelect, activitySelect]
+        .forEach(input => input.disabled = true);
+      saveBtn.classList.add('hidden');
+      editToggle.textContent = '✏️ Edit';
+    });
+
+    /* ========== Backend Status ========== */
+    async function checkBackendStatus() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/`);
+        if (res.ok) {
+          backendStatusEl.textContent = 'Online (Connected)';
+          backendStatusEl.style.color = 'green';
+          checkEndpoints();
+        } else throw new Error();
+      } catch {
+        backendStatusEl.textContent = 'Offline';
+        backendStatusEl.style.color = 'red';
+        endpointsStatusEl.textContent = 'Cannot check endpoints';
+      }
+    }
+
+    async function checkEndpoints() {
+      const endpoints = ['/api/profile', '/api/workout-plan', '/api/meal-plan'];
+      let available = 0;
+
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(`${API_BASE_URL}${ep}`);
+          if (res.ok) available++;
+        } catch {}
+      }
+      endpointsStatusEl.textContent = `${available}/${endpoints.length} available`;
+      endpointsStatusEl.style.color = available === endpoints.length ? 'green' : 'orange';
+    }
+
+    /* ========== Fetch Data ========== */
+    async function fetchUserProfile() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/profile`);
+        const user = await res.json();
+        ageInput.value = user.age;
+        weightInput.value = user.weight;
+        heightInput.value = user.height;
+        genderSelect.value = user.gender;
+        goalSelect.value = user.goal;
+        activitySelect.value = user.activityLevel;
+      } catch (err) { console.error('Profile fetch error:', err); }
+    }
+
+    async function fetchWorkoutPlan() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/workout-plan`);
+        const plan = await res.json();
+        let html = `<div class="plan-section"><h3>${plan.name}</h3>`;
+        plan.exercises.forEach(ex => {
+          html += `
+            <div class="exercise">
+              <h4>${ex.name}</h4>
+              <p>${ex.description}</p>
+              <div class="stats">
+                ${ex.sets ? `<span class="stat">${ex.sets} sets</span>` : ''}
+                ${ex.reps ? `<span class="stat">${ex.reps} reps</span>` : ''}
+                ${ex.duration ? `<span class="stat">${ex.duration} sec</span>` : ''}
+                <span class="stat">${ex.type}</span>
+              </div>
+            </div>`;
+        });
+        workoutPlanEl.innerHTML = html + `</div>`;
+      } catch {
+        workoutPlanEl.innerHTML = '<div class="loading">Error loading workout plan.</div>';
+      }
+    }
+
+    async function fetchMealPlan() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/meal-plan`);
+        const plan = await res.json();
+        let html = `<div class="plan-section"><p><strong>Daily Calories:</strong> ${plan.daily_calories} kcal</p>`;
+        plan.meals.forEach(meal => {
+          html += `
+            <div class="meal">
+              <h4>${meal.name}</h4>
+              <p>${meal.description}</p>
+              <div class="stats">
+                <span class="stat stat-calories">${meal.calories} kcal</span>
+                <span class="stat stat-protein">${meal.protein}g protein</span>
+                <span class="stat stat-carbs">${meal.carbs}g carbs</span>
+                <span class="stat stat-fats">${meal.fats}g fats</span>
+              </div>
+            </div>`;
+        });
+        mealPlanEl.innerHTML = html + `</div>`;
+      } catch {
+        mealPlanEl.innerHTML = '<div class="loading">Error loading meal plan.</div>';
+      }
+    }
+
+    /* ========== Generate Plan ========== */
+    async function generateNewPlan() {
+      try {
+        generateBtn.textContent = 'Generating...';
+        generateBtn.disabled = true;
+
+        const userData = {
+          age: +ageInput.value,
+          weight: +weightInput.value,
+          height: +heightInput.value,
+          gender: genderSelect.value,
+          goal: goalSelect.value,
+          activityLevel: activitySelect.value
+        };
+
+        const res = await fetch(`${API_BASE_URL}/api/generate-plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData)
+        });
+
+        await res.json();
+        const msg = document.createElement('div');
+        msg.classList.add('success-message');
+        msg.textContent = 'Your personalized plan has been generated!';
+        document.querySelector('.demo-banner').after(msg);
+
+        await fetchWorkoutPlan();
+        await fetchMealPlan();
+      } catch {
+        workoutPlanEl.innerHTML = '<div class="loading">Error generating workout plan.</div>';
+        mealPlanEl.innerHTML = '<div class="loading">Error generating meal plan.</div>';
+        alert('Error generating plan. Check backend.');
+      } finally {
+        generateBtn.textContent = 'Generate New Plan';
+        generateBtn.disabled = false;
+      }
+    }
+
+    /* ========== Init App ========== */
+    async function initApp() {
+      await checkBackendStatus();
+      await fetchUserProfile();
+      generateBtn.addEventListener('click', generateNewPlan);
+    }
+
+    document.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
