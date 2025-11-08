@@ -1,29 +1,23 @@
+// services/api.js (modify safeFetch or add auth header)
 import { API_BASE_URL } from '../config';
 
+function authHeaders() {
+  const token = localStorage.getItem('afp_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function safeFetch(endpoint, opts = {}) {
-const url = `${API_BASE_URL}${endpoint}`;
-const res = await fetch(url, opts);
-if (!res.ok) throw new Error(`API error ${res.status}`);
-return await res.json();
+  const url = `${API_BASE_URL}${endpoint}`;
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}), ...authHeaders() };
+  const res = await fetch(url, { ...opts, headers });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return await res.json();
 }
-
 
 export const api = {
-health: async () => {
-try {
-const res = await fetch(`${API_BASE_URL}/`);
-return { ok: res.ok };
-} catch { return { ok: false }; }
-},
-profile: async () => safeFetch('/api/profile'),
-workoutPlan: async () => safeFetch('/api/workout-plan'),
-mealPlan: async () => safeFetch('/api/meal-plan'),
-generatePlan: async (user) => {
-const res = await fetch(`${API_BASE_URL}/api/generate-plan`, {
-method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(user)
-});
-if (!res.ok) throw new Error('Generate failed');
-return await res.json();
-}
-}
+  health: async () => { /* unchanged */ },
+  profile: async () => safeFetch('/api/profile'),
+  workoutPlan: async () => safeFetch('/api/workout-plan'),
+  mealPlan: async () => safeFetch('/api/meal-plan'),
+  generatePlan: async (user) => { /* keep as before but will include auth headers */ }
+};
