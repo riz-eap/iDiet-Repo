@@ -151,6 +151,16 @@ function authMiddleware(req, res, next) {
   }
 }
 
+// TEMP: test bypass - remove after debugging
+app.post('/api/auth/login-test-bypass', (req, res) => {
+  const { email, password } = req.body || {};
+  if (email === 'test@example.com' && password === 'TestPassword123') {
+    return res.json({ token: 'dev-bypass-token', user: { id: 1, name: 'Test User', email } });
+  }
+  return res.status(401).json({ error: 'Invalid credentials (bypass)' });
+});
+
+
 // ---------- API endpoints (protected where appropriate) ----------
 // Try to read values from DB; if DB tables missing or empty, fall back to the in-memory demo data.
 
