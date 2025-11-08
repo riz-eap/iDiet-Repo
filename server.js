@@ -51,3 +51,18 @@ app.post('/api/generate-plan', (req, res) => {
 });
 
 app.listen(8000, () => console.log('✅ Backend running on http://localhost:8000'));
+
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve React frontend
+app.use(express.static(path.join(__dirname, 'build')));
+
+// Catch-all route for React
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
