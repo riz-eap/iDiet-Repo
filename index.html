@@ -263,6 +263,15 @@
       animation-delay: 2s;
     }
 
+    .error-message {
+      background: var(--danger);
+      color: #fff;
+      padding: 10px;
+      text-align: center;
+      border-radius: 6px;
+      margin: 1rem 0;
+    }
+
     @keyframes fadeOut {
       from { opacity: 1; }
       to   { opacity: 0; display: none; }
@@ -275,6 +284,9 @@
       padding: 1rem;
       color: var(--gray);
     }
+
+    /* helper: hide element */
+    .hidden { display: none; }
   </style>
 </head>
 <body>
@@ -287,6 +299,8 @@
     <div class="demo-banner">
       Customize your profile and click "Generate Plan" to create your personalized workout and meal plan
     </div>
+
+    <div id="global-message"></div>
 
     <div class="dashboard">
       <!-- Left Column -->
@@ -400,7 +414,16 @@
   </div>
 
   <script>
-    const API_BASE_URL = 'http://localhost:8000';
+    // ------------------------------------------------------------------
+    // Configuration
+    // ------------------------------------------------------------------
+    // If the page is served from GitHub Pages (or any remote host) we
+    // should not use localhost. Replace PUBLIC_BACKEND_URL with your
+    // actual deployed backend (Render, Vercel, etc).
+    // ------------------------------------------------------------------
+    const PUBLIC_BACKEND_URL = 'https://your-backend-service.example'; // <-- REPLACE this
+    const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    const API_BASE_URL = isLocalhost ? 'http://localhost:8000' : PUBLIC_BACKEND_URL;
 
     // Elements
     const generateBtn = document.getElementById('generate-btn');
@@ -410,6 +433,7 @@
     const mealPlanEl = document.getElementById('meal-plan');
     const backendStatusEl = document.getElementById('backend-status');
     const endpointsStatusEl = document.getElementById('endpoints-status');
+    const globalMessageEl = document.getElementById('global-message');
 
     // Inputs
     const ageInput = document.getElementById('user-age');
@@ -421,7 +445,21 @@
 
     let editMode = false;
 
-    /* ========== Profile Editing ========== */
+    // Helper: attach Authorization header if token present
+    function authHeaders() {
+      const token = localStorage.getItem('afp_token');
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    }
+
+    // Helper: show message
+    function showGlobal(msg, type = 'success') {
+      globalMessageEl.innerHTML = `<div class="${type === 'error' ? 'error-message' : 'success-message'}">${msg}</div>`;
+      setTimeout(()=> { globalMessageEl.innerHTML = ''; }, 3500);
+    }
+
+    // ------------------------------------------------------------------
+    // Profile Editing
+    // ------------------------------------------------------------------
     editToggle.addEventListener('click', () => {
       editMode = !editMode;
       [ageInput, weightInput, heightInput, genderSelect, goalSelect, activitySelect]
@@ -432,10 +470,17 @@
     });
 
     saveBtn.addEventListener('click', () => {
-      const msg = document.createElement('div');
-      msg.classList.add('success-message');
-      msg.textContent = 'Profile updated successfully!';
-      document.querySelector('.demo-banner').after(msg);
+      const profile = {
+        age: +ageInput.value,
+        weight: +weightInput.value,
+        height: +heightInput.value,
+        gender: genderSelect.value,
+        goal: goalSelect.value,
+        activityLevel: activitySelect.value
+      };
+
+      try { localStorage.setItem('afp_profile', JSON.stringify(profile)); } catch (e) {}
+      showGlobal('Profile updated successfully!', 'success');
 
       editMode = false;
       [ageInput, weightInput, heightInput, genderSelect, goalSelect, activitySelect]
@@ -444,19 +489,26 @@
       editToggle.textContent = '✏️ Edit';
     });
 
-    /* ========== Backend Status ========== */
+    // ------------------------------------------------------------------
+    // Backend Status
+    // ------------------------------------------------------------------
     async function checkBackendStatus() {
       try {
-        const res = await fetch(`${API_BASE_URL}/`);
+        const res = await fetch(`${API_BASE_URL}/`, { headers: authHeaders() });
         if (res.ok) {
           backendStatusEl.textContent = 'Online (Connected)';
           backendStatusEl.style.color = 'green';
           checkEndpoints();
-        } else throw new Error();
-      } catch {
+        } else {
+          throw new Error(`Status ${res.status}`);
+        }
+      } catch (err) {
+        console.warn('Backend status check failed', err);
         backendStatusEl.textContent = 'Offline';
         backendStatusEl.style.color = 'red';
         endpointsStatusEl.textContent = 'Cannot check endpoints';
+        // If blocked by client or CORS, give actionable hint:
+        showGlobal('Unable to reach backend. If you are hosting this page on GitHub Pages, set PUBLIC_BACKEND_URL to your deployed backend. Also check ad-blockers / CORS settings.', 'error');
       }
     }
 
@@ -466,77 +518,91 @@
 
       for (const ep of endpoints) {
         try {
-          const res = await fetch(`${API_BASE_URL}${ep}`);
+          const res = await fetch(`${API_BASE_URL}${ep}`, { headers: authHeaders() });
           if (res.ok) available++;
-        } catch {}
+        } catch (err) {
+          // ignore individual endpoint errors (already counted as unavailable)
+        }
       }
       endpointsStatusEl.textContent = `${available}/${endpoints.length} available`;
       endpointsStatusEl.style.color = available === endpoints.length ? 'green' : 'orange';
     }
 
-    /* ========== Fetch Data ========== */
+    // ------------------------------------------------------------------
+    // Fetch Data
+    // ------------------------------------------------------------------
     async function fetchUserProfile() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/profile`);
+        const res = await fetch(`${API_BASE_URL}/api/profile`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('Profile fetch failed');
         const user = await res.json();
-        ageInput.value = user.age;
-        weightInput.value = user.weight;
-        heightInput.value = user.height;
-        genderSelect.value = user.gender;
-        goalSelect.value = user.goal;
-        activitySelect.value = user.activityLevel;
-      } catch (err) { console.error('Profile fetch error:', err); }
+        if (user.age) ageInput.value = user.age;
+        if (user.weight) weightInput.value = user.weight;
+        if (user.height) heightInput.value = user.height;
+        if (user.gender) genderSelect.value = user.gender;
+        if (user.goal) goalSelect.value = user.goal;
+        if (user.activityLevel) activitySelect.value = user.activityLevel;
+      } catch (err) {
+        console.error('Profile fetch error:', err);
+        // keep local values if fetch fails
+      }
     }
 
     async function fetchWorkoutPlan() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/workout-plan`);
+        const res = await fetch(`${API_BASE_URL}/api/workout-plan`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('Workout fetch failed');
         const plan = await res.json();
-        let html = `<div class="plan-section"><h3>${plan.name}</h3>`;
-        plan.exercises.forEach(ex => {
+        let html = `<div class="plan-section">${plan.name ? `<h3>${plan.name}</h3>` : ''}`;
+        (plan.exercises || []).forEach(ex => {
           html += `
             <div class="exercise">
-              <h4>${ex.name}</h4>
-              <p>${ex.description}</p>
+              <h4>${ex.name || ''}</h4>
+              <p>${ex.description || ''}</p>
               <div class="stats">
                 ${ex.sets ? `<span class="stat">${ex.sets} sets</span>` : ''}
                 ${ex.reps ? `<span class="stat">${ex.reps} reps</span>` : ''}
                 ${ex.duration ? `<span class="stat">${ex.duration} sec</span>` : ''}
-                <span class="stat">${ex.type}</span>
+                ${ex.type ? `<span class="stat">${ex.type}</span>` : ''}
               </div>
             </div>`;
         });
         workoutPlanEl.innerHTML = html + `</div>`;
-      } catch {
+      } catch (err) {
+        console.error('fetchWorkoutPlan error', err);
         workoutPlanEl.innerHTML = '<div class="loading">Error loading workout plan.</div>';
       }
     }
 
     async function fetchMealPlan() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/meal-plan`);
+        const res = await fetch(`${API_BASE_URL}/api/meal-plan`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('Meal fetch failed');
         const plan = await res.json();
-        let html = `<div class="plan-section"><p><strong>Daily Calories:</strong> ${plan.daily_calories} kcal</p>`;
-        plan.meals.forEach(meal => {
+        let html = `<div class="plan-section"><p><strong>Daily Calories:</strong> ${plan.daily_calories || '—'} kcal</p>`;
+        (plan.meals || []).forEach(meal => {
           html += `
             <div class="meal">
-              <h4>${meal.name}</h4>
-              <p>${meal.description}</p>
+              <h4>${meal.name || ''}</h4>
+              <p>${meal.description || ''}</p>
               <div class="stats">
-                <span class="stat stat-calories">${meal.calories} kcal</span>
-                <span class="stat stat-protein">${meal.protein}g protein</span>
-                <span class="stat stat-carbs">${meal.carbs}g carbs</span>
-                <span class="stat stat-fats">${meal.fats}g fats</span>
+                ${meal.calories ? `<span class="stat stat-calories">${meal.calories} kcal</span>` : ''}
+                ${meal.protein ? `<span class="stat stat-protein">${meal.protein}g protein</span>` : ''}
+                ${meal.carbs ? `<span class="stat stat-carbs">${meal.carbs}g carbs</span>` : ''}
+                ${meal.fats ? `<span class="stat stat-fats">${meal.fats}g fats</span>` : ''}
               </div>
             </div>`;
         });
         mealPlanEl.innerHTML = html + `</div>`;
-      } catch {
+      } catch (err) {
+        console.error('fetchMealPlan error', err);
         mealPlanEl.innerHTML = '<div class="loading">Error loading meal plan.</div>';
       }
     }
 
-    /* ========== Generate Plan ========== */
+    // ------------------------------------------------------------------
+    // Generate Plan
+    // ------------------------------------------------------------------
     async function generateNewPlan() {
       try {
         generateBtn.textContent = 'Generating...';
@@ -553,32 +619,50 @@
 
         const res = await fetch(`${API_BASE_URL}/api/generate-plan`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
           body: JSON.stringify(userData)
         });
 
-        await res.json();
-        const msg = document.createElement('div');
-        msg.classList.add('success-message');
-        msg.textContent = 'Your personalized plan has been generated!';
-        document.querySelector('.demo-banner').after(msg);
+        if (!res.ok) throw new Error('Generate plan failed');
+        // backend may return a message - ignore for now
+        showGlobal('Your personalized plan has been generated!', 'success');
 
         await fetchWorkoutPlan();
         await fetchMealPlan();
-      } catch {
+      } catch (err) {
+        console.error('generateNewPlan error', err);
         workoutPlanEl.innerHTML = '<div class="loading">Error generating workout plan.</div>';
         mealPlanEl.innerHTML = '<div class="loading">Error generating meal plan.</div>';
-        alert('Error generating plan. Check backend.');
+        showGlobal('Error generating plan. Check backend, CORS, or browser extensions.', 'error');
       } finally {
         generateBtn.textContent = 'Generate New Plan';
         generateBtn.disabled = false;
       }
     }
 
-    /* ========== Init App ========== */
+    // ------------------------------------------------------------------
+    // Init App
+    // ------------------------------------------------------------------
     async function initApp() {
+      // If a profile exists in localStorage, populate fields immediately for snappy UI
+      try {
+        const localProfile = localStorage.getItem('afp_profile');
+        if (localProfile) {
+          const p = JSON.parse(localProfile);
+          if (p.age) ageInput.value = p.age;
+          if (p.weight) weightInput.value = p.weight;
+          if (p.height) heightInput.value = p.height;
+          if (p.gender) genderSelect.value = p.gender;
+          if (p.goal) goalSelect.value = p.goal;
+          if (p.activityLevel) activitySelect.value = p.activityLevel;
+        }
+      } catch {}
+
       await checkBackendStatus();
       await fetchUserProfile();
+      await fetchWorkoutPlan();
+      await fetchMealPlan();
+
       generateBtn.addEventListener('click', generateNewPlan);
     }
 
