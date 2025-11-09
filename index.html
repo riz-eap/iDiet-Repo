@@ -73,118 +73,327 @@
   </div>
 
   <script>
-    // ---------- configuration ----------
-    const PUBLIC_BACKEND_URL = 'https://idiet-repo.onrender.com; // <-- REPLACE this
-    const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    const API_BASE_URL = isLocalhost ? 'http://localhost:8000' : PUBLIC_BACKEND_URL;
+/*
+  Defensive app bootstrap for AI Fitness Planner.
+  Replace the existing inline script block with this.
+  This script:
+   - safely parses localStorage
+   - avoids JSON.parse exceptions
+   - catches network errors and non-JSON responses
+   - shows clear console logs for debugging
+*/
 
-    // ---------- auth guard ----------
-    function getToken(){ return localStorage.getItem('afp_token'); }
-    function getUser(){ try { return JSON.parse(localStorage.getItem('afp_user')||'null'); } catch { return null; } }
+const API_BASE_URL = (typeof API_BASE_URL !== 'undefined') ? API_BASE_URL : 'http://localhost:8000';
 
-    if (!getToken()) {
-      // not logged in — go to login page
-      window.location.href = 'login.html';
+// Safe JSON parse that also clears broken values
+function safeParseLS(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn('safeParseLS: invalid JSON for', key, ' — clearing value', err);
+    localStorage.removeItem(key);
+    return null;
+  }
+}
+
+function safeSetLS(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    console.warn('safeSetLS failed for', key, err);
+  }
+}
+
+// UI helpers (vanilla DOM)
+function showMessage(text, isError = false) {
+  console.log('UI message:', text);
+  // find demo-banner or create ephemeral message area
+  const banner = document.querySelector('.demo-banner');
+  if (!banner) return;
+  let m = document.getElementById('afp_message');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'afp_message';
+    m.style.marginTop = '8px';
+    banner.after(m);
+  }
+  m.textContent = text;
+  m.style.background = isError ? '#fdecea' : '#e6ffef';
+  m.style.color = isError ? '#9b1c1c' : '#065f46';
+  m.style.padding = '8px';
+  m.style.borderRadius = '6px';
+}
+
+// Small spinner node
+function SpinnerInline() {
+  const s = document.createElement('span');
+  s.textContent = '⏳';
+  s.style.marginLeft = '6px';
+  return s;
+}
+
+// Elements
+const generateBtn = document.getElementById('generate-btn');
+const workoutPlanEl = document.getElementById('workout-plan');
+const mealPlanEl = document.getElementById('meal-plan');
+const backendStatusEl = document.getElementById('backend-status');
+const endpointsStatusEl = document.getElementById('endpoints-status');
+
+// Inputs
+const ageInput = document.getElementById('user-age');
+const weightInput = document.getElementById('user-weight');
+const heightInput = document.getElementById('user-height');
+const genderSelect = document.getElementById('user-gender');
+const goalSelect = document.getElementById('user-goal');
+const activitySelect = document.getElementById('user-activity');
+
+let token = safeParseLS('afp_token') || localStorage.getItem('afp_token') || null;
+if (typeof token === 'object') token = null; // defensive
+
+let profile = safeParseLS('afp_profile') || {
+  age: 28, weight: 70, height: 175, gender: 'male', goal: 'lose_weight', activityLevel: 'moderate'
+};
+
+// Render fallback placeholders safely
+function renderPlaceholder(el, titleEmoji, text) {
+  if (!el) return;
+  el.innerHTML = `<div class="placeholder"><div class="placeholder-icon">${titleEmoji}</div><p>${text}</p></div>`;
+}
+
+// Render functions
+function renderProfileToInputs(p) {
+  try {
+    if (ageInput) ageInput.value = p.age ?? '';
+    if (weightInput) weightInput.value = p.weight ?? '';
+    if (heightInput) heightInput.value = p.height ?? '';
+    if (genderSelect) genderSelect.value = p.gender ?? '';
+    if (goalSelect) goalSelect.value = p.goal ?? '';
+    if (activitySelect) activitySelect.value = p.activityLevel ?? '';
+  } catch (err) {
+    console.warn('renderProfileToInputs error', err);
+  }
+}
+
+function renderWorkoutPlan(plan) {
+  if (!plan || !plan.exercises) {
+    renderPlaceholder(workoutPlanEl, '💪', 'Your personalized workout plan will appear here');
+    return;
+  }
+  try {
+    let html = `<div class="plan-section"><h3>${escapeHtml(plan.name || 'Workout')}</h3>`;
+    plan.exercises.forEach(ex => {
+      html += `<div class="exercise"><h4>${escapeHtml(ex.name || '')}</h4><p>${escapeHtml(ex.description||'')}</p><div class="stats">`;
+      if (ex.sets) html += `<span class="stat">${escapeHtml(String(ex.sets))} sets</span>`;
+      if (ex.reps) html += `<span class="stat">${escapeHtml(String(ex.reps))} reps</span>`;
+      if (ex.duration) html += `<span class="stat">${escapeHtml(String(ex.duration))} sec</span>`;
+      if (ex.type) html += `<span class="stat">${escapeHtml(ex.type)}</span>`;
+      html += `</div></div>`;
+    });
+    html += `</div>`;
+    workoutPlanEl.innerHTML = html;
+  } catch (err) {
+    console.warn('renderWorkoutPlan error', err);
+    renderPlaceholder(workoutPlanEl, '💪', 'Error rendering workout plan');
+  }
+}
+
+function renderMealPlan(plan) {
+  if (!plan || !plan.meals) {
+    renderPlaceholder(mealPlanEl, '🍎', 'Your personalized meal plan will appear here');
+    return;
+  }
+  try {
+    let html = `<div class="plan-section"><p><strong>Daily Calories:</strong> ${escapeHtml(String(plan.daily_calories || ''))} kcal</p>`;
+    plan.meals.forEach(meal => {
+      html += `<div class="meal"><h4>${escapeHtml(meal.name||'')}</h4><p class="small">${escapeHtml(meal.description||'')}</p><div class="stats">`;
+      html += `<span class="stat stat-calories">${escapeHtml(String(meal.calories||''))} kcal</span>`;
+      html += `<span class="stat stat-protein">${escapeHtml(String(meal.protein||''))}g protein</span>`;
+      html += `<span class="stat stat-carbs">${escapeHtml(String(meal.carbs||''))}g carbs</span>`;
+      html += `<span class="stat stat-fats">${escapeHtml(String(meal.fats||''))}g fats</span>`;
+      html += `</div></div>`;
+    });
+    html += `</div>`;
+    mealPlanEl.innerHTML = html;
+  } catch (err) {
+    console.warn('renderMealPlan error', err);
+    renderPlaceholder(mealPlanEl, '🍎', 'Error rendering meal plan');
+  }
+}
+
+// Escape helper to avoid injecting broken data
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// HTTP wrapper that returns { ok, status, json, text }
+async function safeFetchJson(url, opts = {}) {
+  try {
+    const res = await fetch(url, opts);
+    const text = await res.text();
+    let json = null;
+    try { json = text ? JSON.parse(text) : null; } catch (e) { json = null; }
+    return { ok: res.ok, status: res.status, json, text, headers: res.headers };
+  } catch (err) {
+    return { error: err.message || String(err) };
+  }
+}
+
+// Check backend health & endpoints
+async function checkBackendStatus() {
+  try {
+    backendStatusEl.textContent = 'Checking...';
+    const r = await safeFetchJson(`${API_BASE_URL}/`);
+    if (r.error) { backendStatusEl.textContent = 'Offline'; backendStatusEl.style.color = 'red'; endpointsStatusEl.textContent = 'Cannot check endpoints'; return; }
+    if (r.ok) {
+      backendStatusEl.textContent = 'Online (Connected)'; backendStatusEl.style.color = 'green';
+      // check endpoints
+      const eps = ['/api/profile','/api/workout-plan','/api/meal-plan'];
+      let available = 0;
+      for (const ep of eps) {
+        const er = await safeFetchJson(`${API_BASE_URL}${ep}`);
+        if (er.ok) available++;
+      }
+      endpointsStatusEl.textContent = `${available}/${eps.length} available`;
+      endpointsStatusEl.style.color = available === eps.length ? 'green' : 'orange';
+      return;
+    } else {
+      backendStatusEl.textContent = `HTTP ${r.status}`; backendStatusEl.style.color = 'orange';
+      endpointsStatusEl.textContent = 'Cannot check endpoints';
     }
+  } catch (err) {
+    backendStatusEl.textContent = 'Offline'; backendStatusEl.style.color = 'red';
+    endpointsStatusEl.textContent = 'Cannot check endpoints';
+  }
+}
 
-    // ---------- render profile top ----------
-    const profileTop = document.getElementById('profile-top');
-    const user = getUser() || {};
-    const initials = (user.name || user.email || 'U').split(' ').map(s=>s[0]).slice(0,2).join('').toUpperCase();
+// Fetch profile from API (protected endpoint if token exists)
+async function fetchUserProfile() {
+  try {
+    if (!token) {
+      renderProfileToInputs(profile);
+      return;
+    }
+    const r = await safeFetchJson(`${API_BASE_URL}/api/profile`, { headers: { 'Authorization': 'Bearer ' + token }});
+    if (r.error) { showMessage('Network error fetching profile', true); renderProfileToInputs(profile); return; }
+    if (!r.ok) {
+      console.warn('/api/profile returned', r.status, r.text);
+      renderProfileToInputs(profile);
+      return;
+    }
+    const user = r.json || {};
+    profile = { ...profile, ...user };
+    safeSetLS('afp_profile', profile);
+    renderProfileToInputs(profile);
+  } catch (err) {
+    console.warn('fetchUserProfile error', err);
+    renderProfileToInputs(profile);
+  }
+}
 
-    profileTop.innerHTML = `
-      <div class="avatar" title="${user.name || user.email}">${initials}</div>
-      <div class="profile-info">
-        <div class="name">${user.name || user.email || 'User'}</div>
-        <div style="font-size:0.85rem;color:var(--gray)">${user.email || ''}</div>
-      </div>
-      <div class="profile-actions">
-        <button id="btn-logout" class="btn btn-logout">Logout</button>
-      </div>
-    `;
+async function fetchWorkoutPlan() {
+  try {
+    if (!token) { renderPlaceholder(workoutPlanEl, '💪','Your personalized workout plan will appear here'); return; }
+    const r = await safeFetchJson(`${API_BASE_URL}/api/workout-plan`, { headers: { 'Authorization': 'Bearer ' + token }});
+    if (r.error) { renderPlaceholder(workoutPlanEl, '💪','Error loading workout plan'); return; }
+    if (!r.ok) { renderPlaceholder(workoutPlanEl, '💪','No workout plan'); return; }
+    renderWorkoutPlan(r.json);
+  } catch (err) {
+    console.warn('fetchWorkoutPlan error', err);
+    renderPlaceholder(workoutPlanEl, '💪','Error loading workout plan');
+  }
+}
 
-    document.getElementById('btn-logout').addEventListener('click', ()=>{
-      localStorage.removeItem('afp_token');
-      localStorage.removeItem('afp_user');
-      window.location.href = 'login.html';
+async function fetchMealPlan() {
+  try {
+    if (!token) { renderPlaceholder(mealPlanEl, '🍎','Your personalized meal plan will appear here'); return; }
+    const r = await safeFetchJson(`${API_BASE_URL}/api/meal-plan`, { headers: { 'Authorization': 'Bearer ' + token }});
+    if (r.error) { renderPlaceholder(mealPlanEl, '🍎','Error loading meal plan'); return; }
+    if (!r.ok) { renderPlaceholder(mealPlanEl, '🍎','No meal plan'); return; }
+    renderMealPlan(r.json);
+  } catch (err) {
+    console.warn('fetchMealPlan error', err);
+    renderPlaceholder(mealPlanEl, '🍎','Error loading meal plan');
+  }
+}
+
+// Generate plan (sends profile to server, protected)
+async function generateNewPlan() {
+  try {
+    if (!generateBtn) return;
+    generateBtn.disabled = true;
+    const spinner = SpinnerInline();
+    generateBtn.appendChild(spinner);
+
+    // refresh profile from inputs
+    profile = {
+      age: Number(ageInput?.value) || profile.age,
+      weight: Number(weightInput?.value) || profile.weight,
+      height: Number(heightInput?.value) || profile.height,
+      gender: genderSelect?.value || profile.gender,
+      goal: goalSelect?.value || profile.goal,
+      activityLevel: activitySelect?.value || profile.activityLevel
+    };
+
+    const body = { ...profile };
+
+    const r = await safeFetchJson(`${API_BASE_URL}/api/generate-plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) },
+      body: JSON.stringify(body)
     });
 
-    // ---------- load profile & plans ----------
-    async function fetchJson(url, opts={}) {
-      const headers = Object.assign({'Content-Type':'application/json'}, opts.headers || {});
-      const token = getToken();
-      if (token) headers.Authorization = 'Bearer ' + token;
-      const res = await fetch(url, Object.assign({}, opts, { headers }));
-      if (!res.ok) throw res;
-      return res.json().catch(()=>null);
+    if (r.error) { showMessage('Network error generating plan', true); return; }
+    if (!r.ok) {
+      showMessage(`Server returned ${r.status} when generating plan`, true);
+      return;
     }
+    showMessage('Plan generated', false);
+    safeSetLS('afp_profile', profile);
 
-    async function loadProfile(){
-      const card = document.getElementById('profile-card');
-      card.innerHTML = '<div class="placeholder">Loading profile...</div>';
-      try {
-        const p = await fetchJson(`${API_BASE_URL}/api/profile`);
-        const html = `
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div><strong>Age</strong><div>${p.age ?? '—'}</div></div>
-            <div><strong>Weight</strong><div>${p.weight ?? '—'} kg</div></div>
-            <div><strong>Height</strong><div>${p.height ?? '—'} cm</div></div>
-            <div><strong>Goal</strong><div>${p.goal ?? '—'}</div></div>
-          </div>
-        `;
-        card.innerHTML = html;
-      } catch (err) {
-        console.warn('profile fetch failed', err);
-        card.innerHTML = '<div class="placeholder">Could not load profile. Check backend or token.</div>';
-      }
-    }
+    // reload plans
+    await fetchWorkoutPlan();
+    await fetchMealPlan();
+  } catch (err) {
+    console.warn('generateNewPlan error', err);
+    showMessage('Error generating plan', true);
+  } finally {
+    try { if (generateBtn) { generateBtn.disabled = false; const s = generateBtn.querySelector('span'); if (s) s.remove(); generateBtn.textContent = 'Generate New Plan'; } } catch(e){}
+  }
+}
 
-    async function loadPlans(){
-      const wp = document.getElementById('workout-plan');
-      const mp = document.getElementById('meal-plan');
-      wp.innerHTML = '<div class="placeholder">Loading workout...</div>';
-      mp.innerHTML = '<div class="placeholder">Loading meal...</div>';
-      try {
-        const w = await fetchJson(`${API_BASE_URL}/api/workout-plan`);
-        const m = await fetchJson(`${API_BASE_URL}/api/meal-plan`);
-        wp.innerHTML = (w && w.exercises && w.exercises.length) ? w.exercises.map(e=>`<div style="padding:8px;border-radius:8px;background:var(--light);margin-bottom:8px"><strong>${e.name}</strong><div style="font-size:0.9rem;color:var(--gray)">${e.description||''}</div></div>`).join('') : '<div class="placeholder">No workout plan found</div>';
-        mp.innerHTML = (m && m.meals && m.meals.length) ? m.meals.map(x=>`<div style="padding:8px;border-radius:8px;background:var(--light);margin-bottom:8px"><strong>${x.name}</strong><div style="font-size:0.9rem;color:var(--gray)">${x.description||''}</div></div>`).join('') : '<div class="placeholder">No meal plan found</div>';
-      } catch (err) {
-        console.warn('plans fetch failed', err);
-        wp.innerHTML = '<div class="placeholder">Error loading workout plan.</div>';
-        mp.innerHTML = '<div class="placeholder">Error loading meal plan.</div>';
-      }
-    }
+// Escape possible bad characters from server side (already done in render helpers)
+function setupButtons() {
+  if (generateBtn) {
+    generateBtn.removeEventListener('click', generateNewPlan).addEventListener('click', generateNewPlan);
+  }
+}
 
-    // API status quick check
-    async function checkApiStatus(){
-      const st = document.getElementById('api-status');
-      st.innerHTML = 'Checking...';
-      try {
-        const res = await fetch(`${API_BASE_URL}/`, {headers: { Authorization: 'Bearer ' + getToken() }});
-        if (!res.ok) throw new Error('offline');
-        // check critical endpoints
-        const eps = ['/api/profile','/api/workout-plan','/api/meal-plan'];
-        let avail = 0;
-        for (const ep of eps) {
-          try {
-            const r = await fetch(`${API_BASE_URL}${ep}`, {headers: { Authorization: 'Bearer ' + getToken() }});
-            if (r.ok) avail++;
-          } catch {}
-        }
-        st.innerHTML = `${avail}/${eps.length} endpoints reachable`;
-      } catch (err) {
-        st.innerHTML = 'Offline or CORS blocked';
-      }
-    }
+// Initialize app
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    console.log('AFP: init', { API_BASE_URL, token });
+    renderProfileToInputs(profile);
+    renderPlaceholder(workoutPlanEl, '💪','Loading workout plan...');
+    renderPlaceholder(mealPlanEl, '🍎','Loading meal plan...');
+    await checkBackendStatus();
+    await fetchUserProfile();
+    await fetchWorkoutPlan();
+    await fetchMealPlan();
+    setupButtons();
+  } catch (err) {
+    console.error('AFP init failed', err);
+    showMessage('App initialization failed — see console.', true);
+  }
+});
+</script>
 
-    // init
-    (async ()=>{
-      await checkApiStatus();
-      await loadProfile();
-      await loadPlans();
-    })();
-  </script>
 </body>
 </html>
+
 
