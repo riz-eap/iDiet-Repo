@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AI Fitness Planner — Login (Bypass)</title>
+  <title>AI Fitness Planner — Login</title>
   <style>
     :root{--primary:#4361ee;--accent:#f72585;--light:#f8f9fa;--dark:#212529;--gray:#adb5bd}
     *{box-sizing:border-box;font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif}
@@ -25,7 +25,7 @@
 <body>
   <div class="card" role="main">
     <h1>Sign in — AI Fitness Planner</h1>
-    <p style="margin:6px 0 14px;color:var(--gray)">This page is temporarily wired to a test bypass endpoint for quick frontend testing.</p>
+    <p style="margin:6px 0 14px;color:var(--gray)">Use the test account while developing.</p>
 
     <form id="loginForm" autocomplete="on">
       <label for="email">Email</label>
@@ -44,90 +44,110 @@
     </form>
   </div>
 
+  <!-- API base selector (auto chooses local or deployed) -->
   <script>
-    // ⚙️ Set your backend base URL here
-    const API_BASE_URL = "https://idiet-repo.onrender.com"; // keep this for Render, or use "http://localhost:8000" to test locally
-
-    const form = document.getElementById('loginForm');
-    const btn = document.getElementById('btnSubmit');
-    const btnClear = document.getElementById('btnClear');
-    const msg = document.getElementById('message');
-
-    function showMessage(text, type='err') {
-      msg.style.display = 'block';
-      msg.textContent = text;
-      msg.className = 'msg ' + (type === 'ok' ? 'ok' : 'err');
-    }
-    function hideMessage() { msg.style.display = 'none'; msg.textContent = ''; msg.className = 'msg'; }
-
-    btnClear.addEventListener('click', () => {
-      document.getElementById('email').value = '';
-      document.getElementById('password').value = '';
-      hideMessage();
-    });
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      hideMessage();
-
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
-
-      if (!email || !password) { showMessage('Please enter both email and password'); return; }
-
-      btn.disabled = true;
-      btn.textContent = 'Signing in...';
-
+    // Adjust if your deployed backend is different
+    window.API_BASE_URL = (function(){
       try {
-        // TEMPORARY BYPASS: posts to login-test-bypass on the server
-        const res = await fetch(`${API_BASE_URL}/api/auth/login-test-bypass`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
+        var host = location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000';
+        return 'https://idiet-repo.onrender.com';
+      } catch(e) { return 'https://idiet-repo.onrender.com'; }
+    })();
 
-        const text = await res.text();
-        let data = null;
-        try { data = JSON.parse(text); } catch (err) { data = null; }
+    // Toggle: if true, login will fallback to login-test-bypass when real endpoint fails (dev only)
+    window.DEV_BYPASS = true;
+  </script>
 
-        if (!res.ok) {
-          // If server returned JSON error, show it; otherwise show raw body
-          const errMsg = data?.error || text || `Server responded ${res.status}`;
-          showMessage(errMsg);
-          btn.disabled = false;
-          btn.textContent = 'Sign in';
-          return;
-        }
+  <script>
+    (function(){
+      const form = document.getElementById('loginForm');
+      const btn = document.getElementById('btnSubmit');
+      const btnClear = document.getElementById('btnClear');
+      const msg = document.getElementById('message');
 
-        // success: expect { token, user }
-        const token = data?.token || null;
-        const user = data?.user || null;
-
-        if (!token) {
-          showMessage('No token returned from server (check bypass route).');
-          btn.disabled = false;
-          btn.textContent = 'Sign in';
-          return;
-        }
-
-        // Save token & user
-        localStorage.setItem('afp_token', token);
-        if (user) localStorage.setItem('afp_user', JSON.stringify(user));
-
-        showMessage('Login successful — redirecting...', 'ok');
-        btn.textContent = 'Success';
-
-        setTimeout(() => {
-          // Redirect to dashboard (or index.html)
-          window.location.href = 'dashboard.html';
-        }, 800);
-      } catch (err) {
-        console.error('Login network error', err);
-        showMessage('Network error. Check backend URL or connection.');
-        btn.disabled = false;
-        btn.textContent = 'Sign in';
+      function showMessage(text, ok){
+        msg.style.display = 'block';
+        msg.textContent = text;
+        msg.className = 'msg ' + (ok ? 'ok' : 'err');
       }
-    });
+      function hideMessage(){ msg.style.display='none'; msg.textContent=''; msg.className='msg'; }
+
+      btnClear.addEventListener('click', () => {
+        document.getElementById('email').value = '';
+        document.getElementById('password').value = '';
+        hideMessage();
+      });
+
+      async function postJson(url, body){
+        try {
+          const res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+          const text = await res.text();
+          let json = null;
+          try { json = text ? JSON.parse(text) : null; } catch(e){ json = null; }
+          return { ok: res.ok, status: res.status, json: json, text };
+        } catch (err) {
+          return { error: String(err) };
+        }
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideMessage();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+
+        if (!email || !password) { showMessage('Enter both email and password'); return; }
+
+        btn.disabled = true;
+        btn.textContent = 'Signing in...';
+
+        // Try real login endpoint
+        const loginUrl = window.API_BASE_URL + '/api/auth/login';
+        const res = await postJson(loginUrl, { email, password });
+
+        // if network error or 404/401 and DEV_BYPASS enabled, try bypass
+        if ((res.error || !res.ok) && window.DEV_BYPASS) {
+          // try bypass endpoint
+          const bypass = await postJson(window.API_BASE_URL + '/api/auth/login-test-bypass', { email, password });
+          if (bypass && bypass.ok && bypass.json && bypass.json.token) {
+            // store token as plain string
+            localStorage.setItem('afp_token', bypass.json.token);
+            localStorage.setItem('afp_user', JSON.stringify(bypass.json.user || null));
+            showMessage('Signed in (bypass). Redirecting...', true);
+            setTimeout(()=> window.location.href = 'index.html', 600);
+            return;
+          }
+        }
+
+        if (res.error) {
+          showMessage('Network error: ' + res.error);
+          btn.disabled = false; btn.textContent = 'Sign in';
+          return;
+        }
+        if (!res.ok) {
+          // show server message if present
+          const text = res.json && res.json.error ? res.json.error : (res.text || ('Server responded ' + res.status));
+          showMessage(text);
+          btn.disabled = false; btn.textContent = 'Sign in';
+          return;
+        }
+
+        // success - expect { token: string, user: object }
+        const token = res.json && res.json.token ? res.json.token : null;
+        const user = res.json && res.json.user ? res.json.user : null;
+        if (!token) {
+          showMessage('No token returned from server');
+          btn.disabled = false; btn.textContent = 'Sign in';
+          return;
+        }
+        localStorage.setItem('afp_token', token);                  // plain string
+        localStorage.setItem('afp_user', JSON.stringify(user || null));
+        showMessage('Login successful — redirecting...', true);
+        btn.textContent = 'Success';
+        setTimeout(()=> window.location.href = 'index.html', 600);
+      });
+    })();
   </script>
 </body>
 </html>
