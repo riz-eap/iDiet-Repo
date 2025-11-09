@@ -5,29 +5,56 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>AI Fitness Planner — App</title>
   <style>
-    :root{--primary:#4361ee;--secondary:#3a0ca3;--accent:#f72585;--light:#f8f9fa;--dark:#212529;--success:#4cc9f0;--gray:#adb5bd}
-    *{box-sizing:border-box;font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif}
-    body{margin:0;padding:20px;background:linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%);color:var(--dark);min-height:100vh}
-    .container{max-width:1200px;margin:0 auto}
-    header{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
-    header h1{margin:0;color:var(--secondary);font-size:1.6rem}
-    .profile-top{display:flex;align-items:center;gap:12px}
-    .avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#f72585,#4361ee);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
-    .profile-info{font-size:0.95rem}
-    .profile-info .name{font-weight:700}
-    .profile-actions{display:flex;gap:8px}
-    .btn{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;font-weight:700}
-    .btn-logout{background:#f94144;color:#fff}
-    .demo-banner{background:var(--primary);color:#fff;padding:10px;border-radius:8px;text-align:center;margin:12px 0;font-weight:600}
-    .dashboard{display:grid;grid-template-columns:1fr 2fr;gap:18px}
-    .card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 8px 18px rgba(0,0,0,0.08)}
-    .placeholder{text-align:center;padding:40px;color:var(--gray);background:var(--light);border-radius:8px}
-    footer{margin-top:18px;color:var(--gray);text-align:center}
-    @media (max-width:900px){.dashboard{grid-template-columns:1fr}}
+    :root {
+      --primary: #4361ee;
+      --secondary: #3a0ca3;
+      --accent: #f72585;
+      --light: #f8f9fa;
+      --dark: #212529;
+      --success: #4cc9f0;
+      --warning: #ffba08;
+      --danger: #f94144;
+      --gray: #adb5bd;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { min-height:100vh; padding:20px; line-height:1.6; color:var(--dark); background: linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%); }
+    .container { max-width:1200px; margin:0 auto; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:18px 0; }
+    header h1 { margin:0; color:var(--secondary); font-size:1.6rem; }
+    .profile-top { display:flex; align-items:center; gap:12px; }
+    .avatar { width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg,#f72585,#4361ee); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; }
+    .profile-info { font-size:0.95rem; }
+    .profile-info .name { font-weight:700; }
+    .profile-actions { display:flex; gap:8px; }
+    .btn { padding:8px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
+    .btn-logout { background:#f94144; color:#fff; }
+    .demo-banner { background:var(--primary); color:#fff; padding:10px; border-radius:8px; text-align:center; margin:12px 0; font-weight:600; }
+    .dashboard { display:grid; grid-template-columns:1fr 2fr; gap:18px; }
+    .card { background:#fff; border-radius:12px; padding:14px; box-shadow:0 8px 18px rgba(0,0,0,0.08); }
+    .placeholder { text-align:center; padding:40px; color:var(--gray); background:var(--light); border-radius:8px; }
+    .card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; padding-bottom:0.5rem; border-bottom:2px solid #f1f3f5; }
+    .card-header h2 { font-size:1.1rem; color:var(--secondary); }
+    .user-info { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    .info-item label { display:block; font-weight:600; color:var(--primary); margin-bottom:0.3rem; }
+    .info-item input, .info-item select { width:100%; padding:0.6rem; border-radius:8px; border:1px solid #ddd; }
+    .unit { position: absolute; right:12px; top:50%; transform:translateY(-50%); color:var(--gray); }
+    .input-with-unit { position:relative; }
+    .btn-generate { background:var(--accent); color:#fff; width:100%; padding:10px; border-radius:8px; font-weight:700; }
+    .btn-save { background:var(--success); color:#fff; }
+    .stats { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.4rem; }
+    .stat { padding:0.3rem 0.6rem; border-radius:20px; background:#fff; border:1px solid #eee; font-weight:600; }
+    .stat-calories{ color:#43aa8b; border:1px solid #43aa8b; }
+    .stat-protein { color:#4361ee; border:1px solid #4361ee; }
+    .stat-carbs { color:#f94144; border:1px solid #f94144; }
+    .stat-fats { color:#f8961e; border:1px solid #f8961e; }
+    .success-message { background:var(--success); color:#fff; padding:8px; border-radius:6px; text-align:center; margin:10px 0; }
+    footer { margin-top:18px; color:var(--gray); text-align:center; }
+    @media (max-width:900px) { .dashboard { grid-template-columns:1fr; } .profile-top { display:none; } }
   </style>
 </head>
 <body>
-  <div class="container" id="app-root">
+  <div class="container">
     <header>
       <div>
         <h1>AI Fitness Planner</h1>
@@ -35,36 +62,47 @@
       </div>
 
       <div class="profile-top" id="profile-top">
-        <!-- inserted by JS -->
+        <!-- Filled by JS with logged-in user or signin link -->
       </div>
     </header>
 
     <div class="demo-banner">Customize your profile and click "Generate Plan" to create your personalized workout and meal plan</div>
 
     <main class="dashboard">
+      <!-- Left column -->
       <div>
         <div class="card">
-          <h3>User Profile</h3>
+          <div class="card-header"><h2>User Profile</h2><div id="profile-actions-area"></div></div>
           <div id="profile-card">
             <div class="placeholder">Loading profile...</div>
           </div>
         </div>
 
         <div class="card" style="margin-top:12px">
-          <h3>API Status</h3>
+          <div class="card-header"><h2>API Status</h2></div>
           <div id="api-status" class="placeholder">Checking...</div>
         </div>
       </div>
 
+      <!-- Right column -->
       <div>
         <div class="card">
-          <h3>Today's Workout Plan</h3>
+          <div class="card-header"><h2>Today's Workout Plan</h2><div style="display:flex;gap:8px"><button id="refresh-btn" class="btn">Refresh</button><button id="download-plan" class="btn">Download Plan</button></div></div>
           <div id="workout-plan" class="placeholder">Your personalized workout plan will appear here</div>
         </div>
 
         <div class="card" style="margin-top:12px">
-          <h3>Today's Meal Plan</h3>
+          <div class="card-header"><h2>Today's Meal Plan</h2><div></div></div>
           <div id="meal-plan" class="placeholder">Your personalized meal plan will appear here</div>
+        </div>
+
+        <div style="margin-top:12px" class="card">
+          <h3>Actions</h3>
+          <div style="display:flex;gap:8px; margin-top:8px">
+            <button id="generate-btn" class="btn-generate">Generate New Plan</button>
+            <button id="logout-btn" class="btn btn-logout" style="display:none">Logout</button>
+          </div>
+          <div id="status-message" style="margin-top:8px"></div>
         </div>
       </div>
     </main>
@@ -72,203 +110,346 @@
     <footer>AI Fitness Planner Demo • Backend: Node.js + Express</footer>
   </div>
 
+  <!-- API base selector (auto chooses local or deployed) -->
   <script>
-/* Minimal, robust bootstrap for AI Fitness Planner.
-   ASCII-only, avoids template literals and emoji.
-   Replace the existing inline script with this block.
-*/
-   window.API_BASE_URL = (function(){
-  try {
-    var host = location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return 'http://localhost:8000';
-    }
-    // When the page is served from GitHub Pages (or any public host), use the deployed HTTPS backend:
-    return 'https://idiet-repo.onrender.com';
-  } catch (e) {
-    return 'https://idiet-repo.onrender.com';
-  }
-})();
-
-(function () {
-  'use strict';
-
-  var API_BASE_URL = 'http://localhost:8000';
-  try {
-    if (typeof window.API_BASE_URL !== 'undefined') API_BASE_URL = window.API_BASE_URL;
-  } catch (e) {}
-
-  function safeParseLS(key) {
-    try {
-      var raw = localStorage.getItem(key);
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch (err) {
-      console.warn('safeParseLS invalid JSON for', key, err);
-      try { localStorage.removeItem(key); } catch(e){}
-      return null;
-    }
-  }
-
-  function safeSetLS(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { console.warn('safeSetLS', e); }
-  }
-
-  function createPlaceholderNode(text) {
-    var d = document.createElement('div');
-    d.className = 'placeholder';
-    d.textContent = text;
-    return d;
-  }
-
-  function clearAndAppend(parent, node) {
-    if (!parent) return;
-    while (parent.firstChild) parent.removeChild(parent.firstChild);
-    parent.appendChild(node);
-  }
-
-  // DOM refs
-  var profileCard = document.getElementById('profile-card');
-  var workoutPlanEl = document.getElementById('workout-plan');
-  var mealPlanEl = document.getElementById('meal-plan');
-  var apiStatus = document.getElementById('api-status');
-  var profileTop = document.getElementById('profile-top');
-
-  // initial fallback
-  var profile = safeParseLS('afp_profile') || { age: 28, weight: 70, height: 175, gender: 'male', goal: 'lose_weight', activityLevel: 'moderate' };
-  var token = localStorage.getItem('afp_token') || null;
-
-  function showApiStatus(text, ok) {
-    if (!apiStatus) return;
-    apiStatus.textContent = text;
-    apiStatus.style.color = ok ? 'green' : '#666';
-  }
-
-  function renderProfileCard(p) {
-    if (!profileCard) return;
-    clearAndAppend(profileCard, createPlaceholderNode('Profile loaded: ' + (p.name || p.email || 'Guest')));
-    // also render top-right profile
-    if (profileTop) {
-      while (profileTop.firstChild) profileTop.removeChild(profileTop.firstChild);
-      var avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      var initials = (p.name || p.email || 'G').toString().trim().substring(0,1).toUpperCase();
-      avatar.textContent = initials;
-      var info = document.createElement('div');
-      info.className = 'profile-info';
-      var nameNode = document.createElement('div');
-      nameNode.className = 'name';
-      nameNode.textContent = p.name || p.email || 'Guest';
-      info.appendChild(nameNode);
-      profileTop.appendChild(avatar);
-      profileTop.appendChild(info);
-    }
-  }
-
-  function renderWorkoutPlan(plan) {
-    if (!workoutPlanEl) return;
-    if (!plan || !plan.exercises) {
-      clearAndAppend(workoutPlanEl, createPlaceholderNode('Your personalized workout plan will appear here'));
-      return;
-    }
-    // build nodes
-    while (workoutPlanEl.firstChild) workoutPlanEl.removeChild(workoutPlanEl.firstChild);
-    var title = document.createElement('h4'); title.textContent = plan.name || 'Workout Plan';
-    workoutPlanEl.appendChild(title);
-    for (var i = 0; i < (plan.exercises || []).length; i++) {
-      var ex = plan.exercises[i];
-      var card = document.createElement('div'); card.className = 'exercise';
-      var h = document.createElement('strong'); h.textContent = ex.name || '';
-      var p = document.createElement('p'); p.className = 'small'; p.textContent = ex.description || '';
-      card.appendChild(h); card.appendChild(p);
-      workoutPlanEl.appendChild(card);
-    }
-  }
-
-  function renderMealPlan(plan) {
-    if (!mealPlanEl) return;
-    if (!plan || !plan.meals) {
-      clearAndAppend(mealPlanEl, createPlaceholderNode('Your personalized meal plan will appear here'));
-      return;
-    }
-    while (mealPlanEl.firstChild) mealPlanEl.removeChild(mealPlanEl.firstChild);
-    var d = document.createElement('div');
-    var calories = document.createElement('p'); calories.innerHTML = '<strong>Daily Calories:</strong> ' + (plan.daily_calories || '');
-    d.appendChild(calories);
-    for (var i=0;i<(plan.meals||[]).length;i++){
-      var m = plan.meals[i];
-      var card = document.createElement('div'); card.className = 'meal';
-      var h = document.createElement('strong'); h.textContent = m.name || '';
-      var p = document.createElement('p'); p.className = 'small'; p.textContent = m.description || '';
-      card.appendChild(h); card.appendChild(p);
-      d.appendChild(card);
-    }
-    mealPlanEl.appendChild(d);
-  }
-
-  // Minimal fetch wrapper
-  function doFetchJson(url, opts) {
-    opts = opts || {};
-    opts.headers = opts.headers || {};
-    if (token) opts.headers['Authorization'] = 'Bearer ' + token;
-    return fetch(url, opts).then(function(res){
-      return res.text().then(function(text){
-        var json = null;
-        try { json = text ? JSON.parse(text) : null; } catch (e) { json = null; }
-        return { ok: res.ok, status: res.status, json: json, text: text };
-      });
-    }).catch(function(err){
-      return { error: String(err) };
-    });
-  }
-
-  function init() {
-    // render initial placeholders
-    renderProfileCard(profile);
-    renderWorkoutPlan(null);
-    renderMealPlan(null);
-    showApiStatus('Checking...', false);
-
-    // check root
-    doFetchJson(API_BASE_URL + '/').then(function(r){
-      if (r.error) { showApiStatus('Offline', false); return; }
-      if (r.ok) {
-        showApiStatus('Online (Connected)', true);
-        // try fetching plan endpoints only if token present
-        if (token) {
-          doFetchJson(API_BASE_URL + '/api/profile').then(function(pRes){
-            if (pRes.ok && pRes.json) {
-              profile = Object.assign({}, profile, pRes.json);
-              safeSetLS('afp_profile', profile);
-              renderProfileCard(profile);
-            } else {
-              renderProfileCard(profile);
-            }
-          });
-          doFetchJson(API_BASE_URL + '/api/workout-plan').then(function(wr){ if (wr.ok && wr.json) renderWorkoutPlan(wr.json); });
-          doFetchJson(API_BASE_URL + '/api/meal-plan').then(function(mr){ if (mr.ok && mr.json) renderMealPlan(mr.json); });
-        } else {
-          // no token: show placeholders and profile only
-          renderProfileCard(profile);
+    // Put this before any code that calls the backend
+    window.API_BASE_URL = (function(){
+      try {
+        var host = location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1') {
+          return 'http://localhost:8000';
         }
-      } else {
-        showApiStatus('HTTP ' + r.status, false);
+        // Deployed backend (HTTPS) used for pages served over HTTPS
+        return 'https://idiet-repo.onrender.com';
+      } catch (e) { return 'https://idiet-repo.onrender.com'; }
+    })();
+    // For compatibility in earlier inline code expecting API_BASE_URL as var:
+    if (typeof API_BASE_URL === 'undefined') { var API_BASE_URL = window.API_BASE_URL; }
+  </script>
+
+  <!-- Defensive app script -->
+  <script>
+    (function(){
+      'use strict';
+
+      // Helpers: safe localStorage parse/set
+      function safeParse(key){
+        try {
+          var v = localStorage.getItem(key);
+          if (!v) return null;
+          return JSON.parse(v);
+        } catch (err){
+          console.warn('safeParse failed for', key, err);
+          try { localStorage.removeItem(key); } catch(e){}
+          return null;
+        }
       }
-    });
-  }
+      function safeSet(key, value){
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){ console.warn('safeSet failed', e); }
+      }
+      function safeRemove(key){ try { localStorage.removeItem(key); } catch(e){} }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+      // Simple UI helpers
+      function setStatusMessage(text, isError){
+        var el = document.getElementById('status-message');
+        if (!el) return;
+        el.textContent = text || '';
+        el.style.color = isError ? 'var(--danger)' : 'var(--success)';
+      }
 
-})();
-</script>
+      function showApiStatus(text, ok){
+        var el = document.getElementById('api-status');
+        if (!el) return;
+        el.textContent = text || '';
+        el.style.color = ok ? 'green' : 'orange';
+      }
 
+      function placeholderNode(text){
+        var d = document.createElement('div');
+        d.className = 'placeholder';
+        d.textContent = text;
+        return d;
+      }
+
+      function escapeHtml(s){
+        if (s == null) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      }
+
+      // DOM refs
+      var profileCard = document.getElementById('profile-card');
+      var workoutPlanEl = document.getElementById('workout-plan');
+      var mealPlanEl = document.getElementById('meal-plan');
+      var generateBtn = document.getElementById('generate-btn');
+      var refreshBtn = document.getElementById('refresh-btn');
+      var downloadBtn = document.getElementById('download-plan');
+      var logoutBtn = document.getElementById('logout-btn');
+      var profileTop = document.getElementById('profile-top');
+      var profileActionsArea = document.getElementById('profile-actions-area');
+
+      // Load token & user
+      var token = safeParse('afp_token') || localStorage.getItem('afp_token') || null;
+      if (typeof token === 'object') token = null;
+      var user = safeParse('afp_user') || null;
+      var profile = safeParse('afp_profile') || { age:28, weight:70, height:175, gender:'male', goal:'lose_weight', activityLevel:'moderate' };
+
+      function renderProfileCardLocal(p){
+        if (!profileCard) return;
+        // clear
+        profileCard.innerHTML = '';
+        var container = document.createElement('div');
+        container.className = 'user-info';
+        // Age
+        var a1 = document.createElement('div'); a1.className='info-item';
+        var la = document.createElement('label'); la.textContent = 'Age'; a1.appendChild(la);
+        var ia = document.createElement('input'); ia.type='number'; ia.value = p.age || ''; ia.disabled = true; a1.appendChild(ia);
+        // Weight
+        var a2 = document.createElement('div'); a2.className='info-item';
+        var lw = document.createElement('label'); lw.textContent = 'Weight'; a2.appendChild(lw);
+        var iw = document.createElement('div'); iw.className='input-with-unit';
+        var iwInput = document.createElement('input'); iwInput.type='number'; iwInput.value = p.weight || ''; iwInput.disabled=true; iw.appendChild(iwInput);
+        var unit = document.createElement('span'); unit.className='unit'; unit.textContent='kg'; iw.appendChild(unit);
+        a2.appendChild(iw);
+        // Height
+        var a3 = document.createElement('div'); a3.className='info-item';
+        var lh = document.createElement('label'); lh.textContent='Height'; a3.appendChild(lh);
+        var ih = document.createElement('div'); ih.className='input-with-unit';
+        var ihInput = document.createElement('input'); ihInput.type = 'number'; ihInput.value = p.height || ''; ihInput.disabled=true; ih.appendChild(ihInput);
+        var unit2 = document.createElement('span'); unit2.className='unit'; unit2.textContent='cm'; ih.appendChild(unit2);
+        a3.appendChild(ih);
+        // Gender
+        var a4 = document.createElement('div'); a4.className='info-item';
+        var lg = document.createElement('label'); lg.textContent='Gender'; a4.appendChild(lg);
+        var sg = document.createElement('select'); sg.disabled=true;
+        var optM = document.createElement('option'); optM.value='male'; optM.text='Male'; if (p.gender==='male') optM.selected=true;
+        var optF = document.createElement('option'); optF.value='female'; optF.text='Female'; if (p.gender==='female') optF.selected=true;
+        var optO = document.createElement('option'); optO.value='other'; optO.text='Other'; if (p.gender==='other') optO.selected=true;
+        sg.appendChild(optM); sg.appendChild(optF); sg.appendChild(optO);
+        a4.appendChild(sg);
+
+        container.appendChild(a1); container.appendChild(a2); container.appendChild(a3); container.appendChild(a4);
+        profileCard.appendChild(container);
+      }
+
+      function renderProfileTop(u){
+        if (!profileTop) return;
+        profileTop.innerHTML = '';
+        if (!u) {
+          var signIn = document.createElement('a'); signIn.href='login.html'; signIn.textContent='Sign in';
+          profileTop.appendChild(signIn);
+          logoutBtn.style.display = 'none';
+          return;
+        }
+        // avatar + name
+        var av = document.createElement('div'); av.className='avatar'; av.textContent = (u.name || u.email || 'U').toString().charAt(0).toUpperCase();
+        var info = document.createElement('div'); info.className='profile-info';
+        var nm = document.createElement('div'); nm.className='name'; nm.textContent = u.name || u.email || 'User';
+        info.appendChild(nm);
+        profileTop.appendChild(av); profileTop.appendChild(info);
+        // logout button visible
+        logoutBtn.style.display = 'inline-block';
+      }
+
+      function setApiStatusText(t, ok){
+        var el = document.getElementById('api-status');
+        if (!el) return;
+        el.textContent = t;
+        el.style.color = ok ? 'green' : 'orange';
+      }
+
+      function renderWorkout(plan){
+        if (!workoutPlanEl) return;
+        if (!plan || !plan.exercises) {
+          workoutPlanEl.innerHTML = '<div class="placeholder">Your personalized workout plan will appear here</div>';
+          return;
+        }
+        var html = '<div class="plan-section"><h3>' + escapeHtml(plan.name || 'Workout Plan') + '</h3>';
+        plan.exercises.forEach(function(ex){
+          html += '<div class="exercise" style="background:var(--light);padding:8px;border-radius:8px;margin-bottom:8px">';
+          html += '<h4>' + escapeHtml(ex.name || '') + '</h4>';
+          html += '<p class="small">' + escapeHtml(ex.description || '') + '</p>';
+          html += '<div class="stats">';
+          if (ex.sets) html += '<span class="stat">' + escapeHtml(String(ex.sets)) + ' sets</span>';
+          if (ex.reps) html += '<span class="stat">' + escapeHtml(String(ex.reps)) + ' reps</span>';
+          if (ex.duration) html += '<span class="stat">' + escapeHtml(String(ex.duration)) + ' sec</span>';
+          if (ex.type) html += '<span class="stat">' + escapeHtml(ex.type) + '</span>';
+          html += '</div></div>';
+        });
+        html += '</div>';
+        workoutPlanEl.innerHTML = html;
+      }
+
+      function renderMeal(plan){
+        if (!mealPlanEl) return;
+        if (!plan || !plan.meals) {
+          mealPlanEl.innerHTML = '<div class="placeholder">Your personalized meal plan will appear here</div>';
+          return;
+        }
+        var html = '<div class="plan-section"><p><strong>Daily Calories:</strong> ' + escapeHtml(String(plan.daily_calories || '')) + ' kcal</p>';
+        plan.meals.forEach(function(meal){
+          html += '<div class="meal" style="background:var(--light);padding:8px;border-radius:8px;margin-bottom:8px">';
+          html += '<h4>' + escapeHtml(meal.name || '') + '</h4>';
+          html += '<p class="small">' + escapeHtml(meal.description || '') + '</p>';
+          html += '<div class="stats">';
+          html += '<span class="stat stat-calories">' + escapeHtml(String(meal.calories || '')) + ' kcal</span>';
+          html += '<span class="stat stat-protein">' + escapeHtml(String(meal.protein || '')) + 'g protein</span>';
+          html += '<span class="stat stat-carbs">' + escapeHtml(String(meal.carbs || '')) + 'g carbs</span>';
+          html += '<span class="stat stat-fats">' + escapeHtml(String(meal.fats || '')) + 'g fats</span>';
+          html += '</div></div>';
+        });
+        html += '</div>';
+        mealPlanEl.innerHTML = html;
+      }
+
+      // fetch wrapper (returns object with ok, status, json, text)
+      function fetchJson(url, opts){
+        opts = opts || {};
+        opts.headers = opts.headers || {};
+        if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+        return fetch(url, opts).then(function(res){
+          return res.text().then(function(txt){
+            var j = null;
+            try { j = txt ? JSON.parse(txt) : null; } catch(e) { j = null; }
+            return { ok: res.ok, status: res.status, json: j, text: txt, headers: res.headers };
+          });
+        }).catch(function(err){ return { error: String(err) }; });
+      }
+
+      // check backend + endpoints
+      function checkBackend(){
+        setApiStatusText('Checking...', false);
+        fetchJson(API_BASE_URL + '/').then(function(r){
+          if (r.error) { setApiStatusText('Offline', false); return; }
+          if (r.ok) {
+            setApiStatusText('Online (Connected)', true);
+            var endpoints = ['/api/profile','/api/workout-plan','/api/meal-plan'];
+            var available = 0;
+            var checks = endpoints.map(function(ep){
+              return fetchJson(API_BASE_URL + ep).then(function(er){ if (er.ok) available++; });
+            });
+            Promise.all(checks).then(function(){
+              var el = document.getElementById('api-status');
+              if (el) { el.textContent = available + '/' + endpoints.length + ' available'; el.style.color = (available === endpoints.length ? 'green':'orange'); }
+            });
+          } else {
+            setApiStatusText('HTTP ' + r.status, false);
+          }
+        });
+      }
+
+      // fetch user profile from API and update UI
+      function fetchUserProfile(){
+        if (!token) {
+          renderProfileCardLocal(profile);
+          renderProfileTop(user);
+          return Promise.resolve();
+        }
+        return fetchJson(API_BASE_URL + '/api/profile').then(function(r){
+          if (r.error) { setStatusMessage('Network error fetching profile', true); renderProfileCardLocal(profile); return; }
+          if (!r.ok) { console.warn('/api/profile', r.status, r.text); renderProfileCardLocal(profile); return; }
+          var u = r.json || {};
+          profile = Object.assign({}, profile, u);
+          safeSet('afp_profile', profile);
+          renderProfileCardLocal(profile);
+          return;
+        });
+      }
+
+      function fetchWorkout(){
+        if (!token) { renderWorkout(null); return Promise.resolve(); }
+        return fetchJson(API_BASE_URL + '/api/workout-plan').then(function(r){
+          if (r.error) { renderWorkout(null); return; }
+          if (!r.ok) { renderWorkout(null); return; }
+          renderWorkout(r.json);
+        });
+      }
+
+      function fetchMeal(){
+        if (!token) { renderMeal(null); return Promise.resolve(); }
+        return fetchJson(API_BASE_URL + '/api/meal-plan').then(function(r){
+          if (r.error) { renderMeal(null); return; }
+          if (!r.ok) { renderMeal(null); return; }
+          renderMeal(r.json);
+        });
+      }
+
+      // generate new plan
+      function generatePlan(){
+        setStatusMessage('Generating plan...', false);
+        generateBtn.disabled = true;
+        var body = {
+          age: profile.age,
+          weight: profile.weight,
+          height: profile.height,
+          gender: profile.gender,
+          goal: profile.goal,
+          activityLevel: profile.activityLevel
+        };
+        fetchJson(API_BASE_URL + '/api/generate-plan', { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(function(r){
+          if (r.error) { setStatusMessage('Network error generating plan', true); generateBtn.disabled=false; return; }
+          if (!r.ok) { setStatusMessage('Server error generating plan ('+r.status+')', true); generateBtn.disabled=false; return; }
+          setStatusMessage('Plan generated successfully', false);
+          // re-fetch plans
+          fetchWorkout();
+          fetchMeal();
+          setTimeout(function(){ setStatusMessage(''); }, 2500);
+          generateBtn.disabled=false;
+        });
+      }
+
+      // download full plan as JSON
+      function downloadPlan(){
+        // combine what's on screen
+        // try to fetch latest to build export
+        Promise.all([ fetchJson(API_BASE_URL + '/api/workout-plan'), fetchJson(API_BASE_URL + '/api/meal-plan') ]).then(function(results){
+          var workout = (results[0] && results[0].ok) ? results[0].json : null;
+          var meal = (results[1] && results[1].ok) ? results[1].json : null;
+          var payload = { workout: workout, meal: meal, profile: profile, exported_at: (new Date()).toISOString() };
+          var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href = url; a.download = 'ai-fitness-plan.json'; document.body.appendChild(a);
+          a.click(); URL.revokeObjectURL(url); a.remove();
+        });
+      }
+
+      function doLogout(){
+        safeRemove('afp_token'); safeRemove('afp_user'); token = null; user = null;
+        renderProfileTop(null); renderProfileCardLocal(profile); setStatusMessage('Logged out', false);
+        logoutBtn.style.display = 'none';
+      }
+
+      // wire buttons
+      if (generateBtn) generateBtn.addEventListener('click', generatePlan);
+      if (refreshBtn) refreshBtn.addEventListener('click', function(){ fetchWorkout(); fetchMeal(); setStatusMessage('Refreshed plans', false); setTimeout(function(){ setStatusMessage(''); }, 1200); });
+      if (downloadBtn) downloadBtn.addEventListener('click', downloadPlan);
+      if (logoutBtn) logoutBtn.addEventListener('click', doLogout);
+
+      // Attempt to load user from storage and show in UI
+      (function initFromStorage(){
+        var storedUser = safeParse('afp_user');
+        if (storedUser) { user = storedUser; }
+        // token maybe saved as string or as JSON-wrapped
+        var storedToken = safeParse('afp_token');
+        if (storedToken && typeof storedToken === 'string') token = storedToken;
+        else if (typeof localStorage.getItem('afp_token') === 'string') token = localStorage.getItem('afp_token');
+        renderProfileTop(user);
+      })();
+
+      // initial boot
+      setApiStatusText('Checking...', false);
+      // Show placeholders while loading
+      renderProfileCardLocal(profile);
+      renderWorkout(null);
+      renderMeal(null);
+
+      // then check backend and fetch data
+      checkBackend();
+      fetchUserProfile().then(function(){ fetchWorkout(); fetchMeal(); });
+
+      // expose a global helper for debug (optional)
+      window.afp = { reload: function(){ checkBackend(); fetchUserProfile(); fetchWorkout(); fetchMeal(); } };
+
+    })();
+  </script>
 </body>
 </html>
-
-
-
-
