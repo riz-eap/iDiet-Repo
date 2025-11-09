@@ -49,28 +49,17 @@ const allowedOrigins = [
   `https://idiet-repo.onrender.com`
 ];
 
-// Dynamic origin check
-app.use(cors({
-  origin: function(origin, callback) {
-    // allow requests with no origin (curl, mobile apps, server-to-server)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    } else {
-      // In production you may want to log and restrict more tightly
-      console.warn('Blocked CORS origin:', origin);
-      return callback(new Error('Not allowed by CORS'), false);
-    }
-  },
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','Accept','X-Requested-With'],
-  credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-}));
 
-// Ensure preflight is handled
+
+// TEMPORARY: allow all origins (for debugging only)
+app.use(cors({
+  origin: true,           // echo back request origin -> allows any origin
+  credentials: true,      // allow cookies/auth if needed
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','Accept','X-Requested-With']
+}));
 app.options('*', cors());
+
 
 // JSON body parsing
 app.use(express.json());
