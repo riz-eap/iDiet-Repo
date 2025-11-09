@@ -77,6 +77,18 @@
    ASCII-only, avoids template literals and emoji.
    Replace the existing inline script with this block.
 */
+   window.API_BASE_URL = (function(){
+  try {
+    var host = location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+    // When the page is served from GitHub Pages (or any public host), use the deployed HTTPS backend:
+    return 'https://idiet-repo.onrender.com';
+  } catch (e) {
+    return 'https://idiet-repo.onrender.com';
+  }
+})();
 
 (function () {
   'use strict';
@@ -256,6 +268,7 @@
 
 </body>
 </html>
+
 
 
 
