@@ -1,170 +1,39 @@
-// server.js
-/**
- * Full-featured server.js
- * - CORS properly configured
- * - /api/auth/login -> checks Postgres users table with bcrypt + returns JWT
- * - demo endpoints for profile, workout-plan, meal-plan (fallback/in-memory)
- * - serves React build from /build
- *
- * Make sure to set environment variables in Render:
- * - DATABASE_URL (optional, otherwise fallback below)
- * - JWT_SECRET (optional, default 'change_this_secret')
- */
-
+// server.js (ES module)
 import express from 'express';
 import cors from 'cors';
-import { Pool } from 'pg';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 const app = express();
 
-// ---------- Configuration ----------
-const PORT = process.env.PORT || 8000;
-const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
-
-// Use DATABASE_URL env if available, otherwise fallback to the external DB URL you provided.
-// It's better to set DATABASE_URL in Render's environment settings.
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://idiet_db_user:i9R4UtzIjPRpeqyDDf0MMQhFS7YVOXrA@dpg-d47kd02dbo4c73f9eg2g-a.oregon-postgres.render.com/idiet_db';
-
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: (process.env.NODE_ENV === 'production') ? { rejectUnauthorized: false } : false
-});
-
-// ---------- CORS ----------
+// ========== CORS ==========
 const allowedOrigins = [
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
+  'http://localhost:8000',
   'http://127.0.0.1:5500',
-  // your GitHub Pages or deployed frontend origin(s) - add your real values here:
   'https://riz-eap.github.io',
-  'https://riz-eap.github.io/iDiet-Repo',
-  // It's okay to include the backend host if same-origin requests happen:
-  `https://idiet-repo.onrender.com`
+  'https://idiet-repo.onrender.com'
 ];
 
-
-
-// TEMPORARY: allow all origins (for debugging only)
+// TEMP: permissive CORS for dev/testing. Reduce for production.
 app.use(cors({
-  origin: true,           // echo back request origin -> allows any origin
-  credentials: true,      // allow cookies/auth if needed
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','Accept','X-Requested-With']
+  origin: function(origin, callback){
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+    // For safety, allow all while developing by uncommenting the next line:
+    // return callback(null, true);
+    return callback(new Error('CORS: Not allowed by origin'));
+  },
+  credentials: true,
 }));
 app.options('*', cors());
 
-
-// JSON body parsing
+// body parser
 app.use(express.json());
 
-// ---------- Helper: DB query wrapper ----------
-async function queryDb(text, params) {
-  const client = await pool.connect();
-  try {
-    const res = await client.query(text, params);
-    return res;
-  } finally {
-    client.release();
-  }
-}
-
-// ---------- Authentication: POST /api/auth/login ----------
-/**
- * Expects JSON body: { email, password }
- * Returns: { token, user } on success
- */
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password } = req.body ?? {};
-    console.log('[DEBUG] login attempt received. email=', JSON.stringify(email));
-
-    if (!email || !password) {
-      console.log('[DEBUG] missing email or password in request body.');
-      return res.status(400).json({ error: 'Email and password required' });
-    }
-
-    // Query DB for user
-    const q = await queryDb('SELECT id, name, email, password, password_hash FROM users WHERE email = $1 LIMIT 1', [email]);
-    const userRow = q.rows[0];
-
-    if (!userRow) {
-      console.log('[DEBUG] NO USER FOUND for email=', email);
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    console.log('[DEBUG] userRow found:', { id: userRow.id, email: userRow.email, has_password: !!userRow.password, has_password_hash: !!userRow.password_hash });
-
-    // Choose hash column
-    const hash = userRow.password || userRow.password_hash;
-    if (!hash) {
-      console.log('[DEBUG] user has no password hash stored');
-      return res.status(500).json({ error: 'No password hash stored for user' });
-    }
-
-    // Compare
-    const match = await bcrypt.compare(password, hash);
-    console.log('[DEBUG] bcrypt.compare result for', email, ':', match);
-
-    if (!match) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // success: sign token
-    const user = { id: userRow.id, name: userRow.name, email: userRow.email };
-    const token = jwt.sign({ sub: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-    console.log('[DEBUG] login success for', email, '-> userId:', user.id);
-    return res.json({ token, user });
-  } catch (err) {
-    console.error('[ERROR] /api/auth/login debug handler', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-// ---------- Middleware: simple auth for protected routes ----------
-function authMiddleware(req, res, next) {
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing token' });
-  const token = auth.slice(7);
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-}
-
-// TEMP: test bypass - remove after debugging
-// TEMP: test bypass - remove after debugging
-app.post('/api/auth/login-test-bypass', (req, res) => {
-  const { email, password } = req.body || {};
-  if (email === 'test@example.com' && password === 'TestPassword123') {
-    return res.json({ token: 'dev-bypass-token', user: { id: 1, name: 'Test User', email } });
-  }
-  return res.status(401).json({ error: 'Invalid credentials (bypass)' });
-});
-
-
-
-// ---------- API endpoints (protected where appropriate) ----------
-// Try to read values from DB; if DB tables missing or empty, fall back to the in-memory demo data.
-
-let demoProfile = {
-  age: 28,
-  weight: 70,
-  height: 175,
-  gender: 'male',
-  goal: 'lose_weight',
-  activityLevel: 'moderate'
+// ========== In-memory sample data (demo) ==========
+let userProfile = {
+  age: 28, weight: 70, height: 175, gender: 'male', goal: 'lose_weight', activityLevel: 'moderate'
 };
 
-let demoWorkoutPlan = {
+let workoutPlan = {
   name: "Full Body Workout",
   exercises: [
     { name: "Push-ups", description: "Chest and triceps", sets: 3, reps: 12, type: "Bodyweight" },
@@ -173,7 +42,7 @@ let demoWorkoutPlan = {
   ]
 };
 
-let demoMealPlan = {
+let mealPlan = {
   daily_calories: 2000,
   meals: [
     { name: "Breakfast", description: "Oatmeal with fruit", calories: 400, protein: 20, carbs: 50, fats: 10 },
@@ -182,136 +51,85 @@ let demoMealPlan = {
   ]
 };
 
+// ========== Simple auth & middleware ==========
+
+const DEV_BYPASS_TOKEN = 'dev-bypass-token';
+
+// Simple login route — in real app replace with DB + bcrypt + JWT
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body || {};
+  // NOTE: this is a demo login only. Replace with real DB verification.
+  if (email === 'test@example.com' && password === 'TestPassword123') {
+    return res.json({ token: DEV_BYPASS_TOKEN, user: { id: 1, name: 'Test User', email } });
+  }
+  return res.status(401).json({ error: 'Invalid credentials' });
+});
+
+// explicit bypass route (optional)
+app.post('/api/auth/login-test-bypass', (req, res) => {
+  const { email, password } = req.body || {};
+  if (email === 'test@example.com' && password === 'TestPassword123') {
+    return res.json({ token: DEV_BYPASS_TOKEN, user: { id: 1, name: 'Test User', email } });
+  }
+  return res.status(401).json({ error: 'Invalid bypass credentials' });
+});
+
+// auth middleware
+function requireAuth(req, res, next) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : (auth || null);
+
+  // Accept dev bypass token
+  if (token === DEV_BYPASS_TOKEN) {
+    req.user = { id: 1, email: 'test@example.com', name: 'Test User' };
+    return next();
+  }
+
+  // In production you'd verify JWT here. For now reject unknown tokens.
+  if (!token) return res.status(401).json({ error: 'Missing token' });
+  return res.status(401).json({ error: 'Unauthorized' });
+}
+
+// ========== Public root ==========
 app.get('/', (req, res) => res.send('Backend online'));
 
-// GET profile for logged-in user (protected)
-app.get('/api/profile', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.sub;
-    const q = await queryDb('SELECT age, weight, height, gender, goal, activity_level FROM profiles WHERE user_id = $1 LIMIT 1', [userId]);
-    if (q.rows.length) {
-      const r = q.rows[0];
-      return res.json({
-        age: r.age,
-        weight: r.weight,
-        height: r.height,
-        gender: r.gender,
-        goal: r.goal,
-        activityLevel: r.activity_level
-      });
-    } else {
-      // fallback demo
-      return res.json(demoProfile);
-    }
-  } catch (err) {
-    console.error('/api/profile error', err);
-    return res.status(500).json({ error: 'Server error' });
-  }
+// ========== Protected endpoints ==========
+app.get('/api/profile', requireAuth, (req, res) => {
+  // return profile (in real app use req.user.id)
+  res.json(userProfile);
 });
 
-// GET workout-plan for logged-in user (protected)
-app.get('/api/workout-plan', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.sub;
-    const q = await queryDb('SELECT name, exercises FROM workout_plans WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [userId]);
-    if (q.rows.length) {
-      return res.json(q.rows[0]);
-    } else {
-      return res.json(demoWorkoutPlan);
-    }
-  } catch (err) {
-    console.error('/api/workout-plan error', err);
-    return res.status(500).json({ error: 'Server error' });
-  }
+app.get('/api/workout-plan', requireAuth, (req, res) => {
+  res.json(workoutPlan);
 });
 
-// GET meal-plan for logged-in user (protected)
-app.get('/api/meal-plan', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.sub;
-    const q = await queryDb('SELECT daily_calories, meals FROM meal_plans WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [userId]);
-    if (q.rows.length) {
-      return res.json(q.rows[0]);
-    } else {
-      return res.json(demoMealPlan);
-    }
-  } catch (err) {
-    console.error('/api/meal-plan error', err);
-    return res.status(500).json({ error: 'Server error' });
-  }
+app.get('/api/meal-plan', requireAuth, (req, res) => {
+  res.json(mealPlan);
 });
 
-// POST generate-plan (protected) - stores a simple plan in DB (or updates demo)
-app.post('/api/generate-plan', authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.sub;
-    const { age, weight, height, gender, goal, activityLevel } = req.body;
-
-    // For simplicity, generate a trivial plan and insert
-    const generatedWorkout = {
-      name: 'Generated Plan',
-      exercises: [
-        { name: 'Jumping Jacks', description: 'Warm up', sets: 3, reps: 30, type: 'cardio' }
-      ]
-    };
-    const generatedMeal = {
-      daily_calories: 2000,
-      meals: [
-        { name: 'Generated Breakfast', description: 'Example', calories: 400, protein: 20, carbs: 50, fats: 10 }
-      ]
-    };
-
-    // insert into DB if tables exist
-    try {
-      await queryDb(
-        'INSERT INTO workout_plans (user_id, name, exercises) VALUES ($1, $2, $3::jsonb)',
-        [userId, generatedWorkout.name, JSON.stringify(generatedWorkout.exercises)]
-      );
-      await queryDb(
-        'INSERT INTO meal_plans (user_id, daily_calories, meals) VALUES ($1, $2, $3::jsonb)',
-        [userId, generatedMeal.daily_calories, JSON.stringify(generatedMeal.meals)]
-      );
-      // update profile table if exists
-      await queryDb(
-        `INSERT INTO profiles (user_id, age, weight, height, gender, goal, activity_level)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT (user_id) DO UPDATE SET age=EXCLUDED.age, weight=EXCLUDED.weight, height=EXCLUDED.height, gender=EXCLUDED.gender, goal=EXCLUDED.goal, activity_level=EXCLUDED.activity_level`,
-        [userId, age, weight, height, gender, goal, activityLevel]
-      );
-      return res.json({ message: 'Plan generated and saved' });
-    } catch (dbErr) {
-      console.warn('DB insert failed (tables may not exist):', dbErr.message);
-      // fallback: update demo
-      demoProfile = { age, weight, height, gender, goal, activityLevel };
-      demoWorkoutPlan = generatedWorkout;
-      demoMealPlan = generatedMeal;
-      return res.json({ message: 'Plan generated (in-memory fallback)' });
-    }
-  } catch (err) {
-    console.error('/api/generate-plan error', err);
-    return res.status(500).json({ error: 'Server error' });
-  }
+app.post('/api/generate-plan', requireAuth, (req, res) => {
+  const { age, weight, height, gender, goal, activityLevel } = req.body || {};
+  // update stored profile and dummy-generate plans (replace with AI logic)
+  userProfile = { age, weight, height, gender, goal, activityLevel };
+  // Simple generation heuristic example:
+  workoutPlan = {
+    name: "Generated Plan",
+    exercises: [
+      { name: "Jumping Jacks", description: "Warmup", sets: 3, reps: 30, type: "cardio" },
+      { name: "Bodyweight Squats", description: "Leg strength", sets: 4, reps: 12, type: "strength" }
+    ]
+  };
+  mealPlan = {
+    daily_calories: 2000,
+    meals: [
+      { name: "Breakfast", description: "Yogurt + fruit", calories: 350, protein: 15, carbs: 50, fats: 8 },
+      { name: "Lunch", description: "Chicken salad", calories: 600, protein: 45, carbs: 40, fats: 18 },
+      { name: "Dinner", description: "Vegetable stir fry + rice", calories: 550, protein: 20, carbs: 80, fats: 12 }
+    ]
+  };
+  res.json({ message: 'Plan generated (demo)' });
 });
 
-// ---------- Serve React build (after API routes) ----------
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-app.use(express.static(path.join(__dirname, 'build')));
-
-// If no route matched above, serve the SPA index (useful for React Router)
-app.get('*', (req, res) => {
-  // if it's an API route, return 404 JSON
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API route not found' });
-  }
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
-
-// ---------- Start server ----------
-app.listen(PORT, () => {
-  console.log(`✅ Backend running on ${PORT} (NODE_ENV=${process.env.NODE_ENV || 'development'})`);
-  // test DB connection
-  pool.connect()
-    .then(client => { client.release(); console.log('Connected to DB'); })
-    .catch(err => console.warn('DB connection warning:', err.message));
-});
+// start server
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => console.log(`✅ Backend running on http://localhost:${PORT}`));
