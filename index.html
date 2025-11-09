@@ -128,14 +128,13 @@
       function safeRemove(key){ try { localStorage.removeItem(key); } catch(e){} }
 
       function loadTokenSafe(){
-        try {
-          var raw = localStorage.getItem('afp_token');
-          if (!raw) return null;
-          // if it's a JSON stringified value, try parse; otherwise return raw
-          try { var parsed = JSON.parse(raw); if (typeof parsed === 'string') return parsed; } catch(e){}
-          return raw;
-        } catch(e) { return null; }
-      }
+  try {
+    var raw = localStorage.getItem('afp_token');
+    if (!raw) return null;
+    try { var parsed = JSON.parse(raw); if (typeof parsed === 'string') return parsed; } catch(e){}
+    return raw;
+  } catch(e) { return null; }
+}
 
       function setStatusMessage(text, isError){
         var el = document.getElementById('status-message');
@@ -256,18 +255,22 @@
       }
 
       // fetch wrapper with Authorization injection
-      function fetchJson(url, opts){
-        opts = opts || {};
-        opts.headers = opts.headers || {};
-        if (!opts.headers['Authorization'] && token) opts.headers['Authorization'] = 'Bearer ' + token;
-        return fetch(url, opts).then(function(res){
-          return res.text().then(function(txt){
-            var j = null;
-            try { j = txt ? JSON.parse(txt) : null; } catch(e) { j = null; }
-            return { ok: res.ok, status: res.status, json: j, text: txt, headers: res.headers };
-          });
-        }).catch(function(err){ return { error: String(err) }; });
-      }
+     function fetchJson(url, opts){
+  opts = opts || {};
+  opts.headers = opts.headers || {};
+  // always read token fresh from storage so newly-saved token is used immediately
+  var currentToken = loadTokenSafe();
+  if (!opts.headers['Authorization'] && currentToken) opts.headers['Authorization'] = 'Bearer ' + currentToken;
+  return fetch(url, opts).then(function(res){
+    return res.text().then(function(txt){
+      var j = null;
+      try { j = txt ? JSON.parse(txt) : null; } catch(e) { j = null; }
+      return { ok: res.ok, status: res.status, json: j, text: txt, headers: res.headers };
+    });
+  }).catch(function(err){
+    return { error: String(err) };
+  });
+}
 
       // check backend status and endpoints
       function checkBackend(){
@@ -357,3 +360,4 @@
   </script>
 </body>
 </html>
+
