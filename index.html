@@ -188,8 +188,20 @@
       var profileActionsArea = document.getElementById('profile-actions-area');
 
       // Load token & user
-      var token = safeParse('afp_token') || localStorage.getItem('afp_token') || null;
-      if (typeof token === 'object') token = null;
+     var token = null;
+try {
+  // prefer raw string if present
+  var rawToken = localStorage.getItem('afp_token');
+  if (rawToken && typeof rawToken === 'string') {
+    token = rawToken;
+  } else {
+    // fallback: maybe someone stored JSON, attempt safeParse
+    var parsed = safeParse('afp_token');
+    if (parsed && typeof parsed === 'string') token = parsed;
+  }
+} catch (e) {
+  token = null;
+}
       var user = safeParse('afp_user') || null;
       var profile = safeParse('afp_profile') || { age:28, weight:70, height:175, gender:'male', goal:'lose_weight', activityLevel:'moderate' };
 
@@ -453,3 +465,4 @@
   </script>
 </body>
 </html>
+
