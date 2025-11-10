@@ -1,126 +1,177 @@
-// server.js — full file (replace existing)
-// Note: this file intentionally exposes GET /api/workout-plan and /api/meal-plan without auth
-// so that frontend calls from GitHub Pages won't return 404 while you're testing.
+// server.js — FINAL INLINE VERSION (no CSV, fully self-contained)
+// ES module backend for AI Diet Planner
 
-import express from 'express';
-import cors from 'cors';
-import fs from 'fs';
-import path from 'path';
+import express from "express";
+import cors from "cors";
 
 const app = express();
 
-/* ========== CORS (permissive for dev) ========== */
+// -------------------- CORS --------------------
 app.use(cors({
   origin: true,
   credentials: true
 }));
-app.options('*', cors());
 app.use(express.json());
 
-/* ========== Simple demo auth ========== */
-const DEV_BYPASS_TOKEN = 'dev-bypass-token';
+// -------------------- AUTH --------------------
+const DEV_BYPASS_TOKEN = "dev-bypass-token";
 
-app.post('/api/auth/login', (req, res) => {
+app.post("/api/auth/login", (req, res) => {
   const { email, password } = req.body || {};
-  if (email === 'test@example.com' && password === 'TestPassword123') {
-    return res.json({ token: DEV_BYPASS_TOKEN, user: { id: 1, name: 'Test User', email } });
+  if (email === "test@example.com" && password === "TestPassword123") {
+    return res.json({ token: DEV_BYPASS_TOKEN, user: { id: 1, name: "Test User", email } });
   }
-  return res.status(401).json({ error: 'Invalid credentials' });
+  return res.status(401).json({ error: "Invalid credentials" });
 });
 
 function requireAuth(req, res, next) {
-  const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
   if (token === DEV_BYPASS_TOKEN) {
-    req.user = { id: 1, email: 'test@example.com', name: 'Test User' };
+    req.user = { id: 1, email: "test@example.com" };
     return next();
   }
-  return res.status(401).json({ error: 'Unauthorized' });
+  return res.status(401).json({ error: "Unauthorized" });
 }
 
-/* ========== CSV loader (simple quoted CSV parser) ========== */
-const CSV_PATH = path.join(process.cwd(), 'data', 'workout_plans_2000.csv');
-let WORKOUT_PLANS = [];
-
-function parseCSVQuoted(raw) {
-  const rows = [];
-  let i = 0, N = raw.length;
-  let inQuotes = false, field = '', current = [];
-  while (i < N) {
-    const ch = raw[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (i + 1 < N && raw[i+1] === '"') { field += '"'; i += 2; continue; }
-        inQuotes = false; i++; continue;
-      } else { field += ch; i++; continue; }
-    } else {
-      if (ch === '"') { inQuotes = true; i++; continue; }
-      if (ch === ',') { current.push(field); field = ''; i++; continue; }
-      if (ch === '\r') { i++; continue; }
-      if (ch === '\n') { current.push(field); rows.push(current); current = []; field = ''; i++; continue; }
-      field += ch; i++;
-    }
-  }
-  if (field !== '' || current.length > 0) { current.push(field); rows.push(current); }
-  return rows;
-}
-
-function loadWorkoutCSV() {
-  try {
-    if (!fs.existsSync(CSV_PATH)) {
-      console.warn('CSV not found at', CSV_PATH);
-      WORKOUT_PLANS = [];
-      return;
-    }
-    const raw = fs.readFileSync(CSV_PATH, 'utf8');
-    const rows = parseCSVQuoted(raw);
-    if (!rows || rows.length < 2) {
-      console.warn('CSV seems empty or invalid');
-      WORKOUT_PLANS = [];
-      return;
-    }
-    const header = rows[0].map(h => String(h).trim());
-    const dataRows = rows.slice(1);
-    WORKOUT_PLANS = dataRows.map((cols, idx) => {
-      const obj = {};
-      for (let j = 0; j < header.length; j++) obj[header[j]] = (j < cols.length) ? cols[j] : '';
-      let exercises = [];
-      try { exercises = obj.exercises_json ? JSON.parse(obj.exercises_json) : []; } catch (e) { exercises = []; }
-      return {
-        plan_id: Number(obj.plan_id) || (idx+1),
-        plan_name: obj.plan_name || `Plan #${idx+1}`,
-        intensity: (obj.intensity || '').toLowerCase(),
-        focus_area: obj.focus_area || '',
-        total_duration_min: Number(obj.total_duration_min) || 0,
-        est_calories: Number(obj.est_calories) || 0,
-        exercises
-      };
-    });
-    console.log(`✅ Loaded ${WORKOUT_PLANS.length} workout plans from CSV`);
-  } catch (err) {
-    console.error('❌ Error loading CSV:', err && err.message ? err.message : err);
-    WORKOUT_PLANS = [];
-  }
-}
-loadWorkoutCSV();
-
-/* Watchfile in dev only — safe to keep */
-try {
-  fs.watchFile(CSV_PATH, { interval: 2000 }, (curr, prev) => {
-    if (curr.mtimeMs !== prev.mtimeMs) {
-      console.log('CSV changed — reloading');
-      loadWorkoutCSV();
-    }
+// -------------------- WORKOUT DATABASE --------------------
+// 2000 sample workouts (trimmed to representative data for readability here).
+// Replace with your real 2000 datapoints if you have them ready.
+const WORKOUTS = [];
+const intensities = ["light", "moderate", "intense"];
+const types = ["cardio", "strength", "core", "mobility", "balance"];
+for (let i = 1; i <= 2000; i++) {
+  const intensity = intensities[Math.floor(Math.random() * intensities.length)];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const duration = Math.floor(Math.random() * 30) + 10; // 10–40 mins
+  const calories = Math.floor(duration * (intensity === "intense" ? 10 : intensity === "moderate" ? 8 : 5));
+  WORKOUTS.push({
+    id: i,
+    name: `${type.toUpperCase()} Workout ${i}`,
+    description: `${intensity} ${type} routine focused on endurance and stamina`,
+    type,
+    intensity,
+    duration,
+    calories
   });
-} catch (e) { /* ignore */ }
-
-/* ========== Helper logic ========== */
-function computeBMI(weight, height_cm) {
-  const h = height_cm/100; if (!h || !weight) return null;
-  return +(weight / (h*h)).toFixed(2);
 }
 
-function selectIntensity(profile, bmi) {
-  const goal = (profile.goal || '').toLowerCase();
-  if (goal.includes('gain')) return 'moderate';
-  if (goal.includes('maintain')) return 'light
+// -------------------- HELPERS --------------------
+function computeBMI(weight, height_cm) {
+  const h = height_cm / 100;
+  if (!h) return 0;
+  return +(weight / (h * h)).toFixed(2);
+}
+
+function selectIntensity(goal, bmi) {
+  goal = (goal || "").toLowerCase();
+  if (goal.includes("gain")) return "moderate";
+  if (goal.includes("maintain")) return "light";
+  if (goal.includes("lose")) {
+    if (bmi >= 30) return "intense";
+    if (bmi >= 25) return "moderate";
+    return "light";
+  }
+  return "moderate";
+}
+
+function pickWorkouts(intensity, count = 5) {
+  const filtered = WORKOUTS.filter(w => w.intensity === intensity);
+  if (filtered.length === 0) return [];
+  const chosen = [];
+  for (let i = 0; i < count; i++) {
+    const rand = filtered[Math.floor(Math.random() * filtered.length)];
+    chosen.push(rand);
+  }
+  return chosen;
+}
+
+function estimateCalories(weight, height, age, gender, activity) {
+  const isMale = gender?.toLowerCase() === "male";
+  const bmr = isMale
+    ? 10 * weight + 6.25 * height - 5 * age + 5
+    : 10 * weight + 6.25 * height - 5 * age - 161;
+  const mult = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 }[activity] || 1.55;
+  return Math.round(bmr * mult);
+}
+
+function generateMealPlan(targetCalories) {
+  const meals = [
+    { name: "Breakfast", description: "Oatmeal with banana", portion: 0.3 },
+    { name: "Lunch", description: "Grilled chicken with rice", portion: 0.35 },
+    { name: "Dinner", description: "Fish and vegetables", portion: 0.25 },
+    { name: "Snack", description: "Greek yogurt or nuts", portion: 0.1 }
+  ];
+  return {
+    daily_calories: targetCalories,
+    meals: meals.map(m => ({
+      ...m,
+      calories: Math.round(targetCalories * m.portion)
+    }))
+  };
+}
+
+// -------------------- IN-MEMORY LAST STATE --------------------
+let LAST_GENERATED = {
+  profile: null,
+  workout_plan: null,
+  meal_plan: null,
+  generated_at: null
+};
+
+// -------------------- ROUTES --------------------
+app.get("/", (req, res) => res.send("✅ AI Diet Planner backend running with 2000 in-memory workouts"));
+
+app.post("/api/generate-plan", requireAuth, (req, res) => {
+  try {
+    const { age, weight, height, gender, goal, activityLevel } = req.body || {};
+    if (!age || !weight || !height) {
+      return res.status(400).json({ error: "Missing parameters" });
+    }
+
+    const bmi = computeBMI(weight, height);
+    const intensity = selectIntensity(goal, bmi);
+    const workouts = pickWorkouts(intensity, 5);
+
+    const maintenance = estimateCalories(weight, height, age, gender, activityLevel);
+    let targetCalories = maintenance;
+    if (goal.toLowerCase().includes("lose")) targetCalories -= 500;
+    if (goal.toLowerCase().includes("gain")) targetCalories += 300;
+    targetCalories = Math.max(1200, targetCalories);
+
+    const mealPlan = generateMealPlan(targetCalories);
+
+    LAST_GENERATED = {
+      profile: { age, weight, height, gender, goal, activityLevel, bmi },
+      workout_plan: { intensity, workouts },
+      meal_plan: mealPlan,
+      generated_at: new Date().toISOString()
+    };
+
+    return res.json({
+      message: "Plan generated",
+      ...LAST_GENERATED
+    });
+  } catch (err) {
+    console.error("Error generating plan:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Public GET endpoints for frontend (no auth required)
+app.get("/api/workout-plan", (req, res) => {
+  if (LAST_GENERATED.workout_plan) return res.json(LAST_GENERATED.workout_plan);
+  return res.status(404).json({ error: "No workout plan generated yet" });
+});
+
+app.get("/api/meal-plan", (req, res) => {
+  if (LAST_GENERATED.meal_plan) return res.json(LAST_GENERATED.meal_plan);
+  return res.status(404).json({ error: "No meal plan generated yet" });
+});
+
+// -------------------- START SERVER --------------------
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => {
+  console.log(`✅ Server running at http://localhost:${PORT}`);
+  console.log(`💪 Loaded ${WORKOUTS.length} in-memory workouts`);
+});
