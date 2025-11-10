@@ -1,10 +1,13 @@
 // server.js (ES module)
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+import { parse } from 'csv-parse/sync';
 
 const app = express();
 
-// ========== CORS ==========
+// ==================== CORS ====================
 const allowedOrigins = [
   'http://localhost:8000',
   'http://127.0.0.1:5500',
@@ -12,60 +15,30 @@ const allowedOrigins = [
   'https://idiet-repo.onrender.com'
 ];
 
-// TEMP: permissive CORS for dev/testing. Reduce for production.
 app.use(cors({
-  origin: function(origin, callback){
+  origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
-    // For safety, allow all while developing by uncommenting the next line:
+    // Uncomment below to allow all origins during development:
     // return callback(null, true);
     return callback(new Error('CORS: Not allowed by origin'));
   },
   credentials: true,
 }));
 app.options('*', cors());
-
-// body parser
 app.use(express.json());
 
-// ========== In-memory sample data (demo) ==========
-let userProfile = {
-  age: 28, weight: 70, height: 175, gender: 'male', goal: 'lose_weight', activityLevel: 'moderate'
-};
-
-let workoutPlan = {
-  name: "Full Body Workout",
-  exercises: [
-    { name: "Push-ups", description: "Chest and triceps", sets: 3, reps: 12, type: "Bodyweight" },
-    { name: "Squats", description: "Legs and glutes", sets: 3, reps: 15, type: "Bodyweight" },
-    { name: "Plank", description: "Core stability", duration: 60, type: "Core" }
-  ]
-};
-
-let mealPlan = {
-  daily_calories: 2000,
-  meals: [
-    { name: "Breakfast", description: "Oatmeal with fruit", calories: 400, protein: 20, carbs: 50, fats: 10 },
-    { name: "Lunch", description: "Grilled chicken with rice", calories: 600, protein: 45, carbs: 70, fats: 15 },
-    { name: "Dinner", description: "Salmon with veggies", calories: 500, protein: 35, carbs: 30, fats: 20 }
-  ]
-};
-
-// ========== Simple auth & middleware ==========
-
+// ==================== AUTH SETUP ====================
 const DEV_BYPASS_TOKEN = 'dev-bypass-token';
 
-// Simple login route — in real app replace with DB + bcrypt + JWT
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body || {};
-  // NOTE: this is a demo login only. Replace with real DB verification.
   if (email === 'test@example.com' && password === 'TestPassword123') {
     return res.json({ token: DEV_BYPASS_TOKEN, user: { id: 1, name: 'Test User', email } });
   }
   return res.status(401).json({ error: 'Invalid credentials' });
 });
 
-// explicit bypass route (optional)
 app.post('/api/auth/login-test-bypass', (req, res) => {
   const { email, password } = req.body || {};
   if (email === 'test@example.com' && password === 'TestPassword123') {
@@ -74,62 +47,139 @@ app.post('/api/auth/login-test-bypass', (req, res) => {
   return res.status(401).json({ error: 'Invalid bypass credentials' });
 });
 
-// auth middleware
 function requireAuth(req, res, next) {
   const auth = req.headers.authorization || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : (auth || null);
-
-  // Accept dev bypass token
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
   if (token === DEV_BYPASS_TOKEN) {
     req.user = { id: 1, email: 'test@example.com', name: 'Test User' };
     return next();
   }
-
-  // In production you'd verify JWT here. For now reject unknown tokens.
   if (!token) return res.status(401).json({ error: 'Missing token' });
   return res.status(401).json({ error: 'Unauthorized' });
 }
 
-// ========== Public root ==========
-app.get('/', (req, res) => res.send('Backend online'));
+// ==================== LOAD CSV DATA ====================
+const CSV_PATH = path.join(process.cwd(), 'data', 'workout_plans_2000.csv');
+let WORKOUT_PLANS = [];
 
-// ========== Protected endpoints ==========
+function loadWorkoutCSV() {
+  try {
+    const raw = fs.readFileSync(CSV_PATH, 'utf8');
+    const rows = parse(raw, { columns: true, skip_empty_lines: true });
+    WORKOUT_PLANS = rows.map(r => {
+      let exercises = [];
+      try { exercises = JSON.parse(r.exercises_json || '[]'); } catch (e) { exercises = []; }
+      return {
+        plan_id: Number(r.plan_id),
+        plan_name: r.plan_name,
+        intensity: (r.intensity || '').toLowerCase(),
+        focus_area: r.focus_area || '',
+        total_duration_min: Number(r.total_duration_min) || 0,
+        est_calories: Number(r.est_calories) || 0,
+        exercises
+      };
+    });
+    console.log(`✅ Loaded ${WORKOUT_PLANS.length} workout plans from CSV`);
+  } catch (err) {
+    console.error('❌ Failed to load CSV:', err.message);
+    WORKOUT_PLANS = [];
+  }
+}
+loadWorkoutCSV();
+
+// ==================== HELPER FUNCTIONS ====================
+function computeBMI(weight, height_cm) {
+  const h = height_cm / 100;
+  return +(weight / (h * h)).toFixed(2);
+}
+
+function selectIntensity(profile, bmi) {
+  const goal = (profile.goal || '').toLowerCase();
+  if (goal.includes('gain')) return 'moderate';
+  if (goal.includes('maintain')) return 'light';
+  if (goal.includes('lose')) {
+    if (bmi >= 30) return 'intense';
+    if (bmi >= 25) return 'moderate';
+    return 'light';
+  }
+  return 'moderate';
+}
+
+function pickWorkoutPlan(intensity, focus = null) {
+  const candidates = WORKOUT_PLANS.filter(p => p.intensity === intensity);
+  if (!candidates.length) return WORKOUT_PLANS[Math.floor(Math.random() * WORKOUT_PLANS.length)];
+  if (focus) {
+    const match = candidates.filter(p => p.focus_area.toLowerCase() === focus.toLowerCase());
+    if (match.length) return match[Math.floor(Math.random() * match.length)];
+  }
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function estimateCalories(weight, height, age, gender, activity) {
+  const bmr = (gender === 'male')
+    ? 10 * weight + 6.25 * height - 5 * age + 5
+    : 10 * weight + 6.25 * height - 5 * age - 161;
+  const activityMult = {
+    sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9
+  };
+  return Math.round(bmr * (activityMult[activity] || 1.55));
+}
+
+function generateMealPlan(targetCalories) {
+  const proteinPerc = 0.3, fatPerc = 0.25, carbPerc = 0.45;
+  const proteinC = targetCalories * proteinPerc;
+  const fatC = targetCalories * fatPerc;
+  const carbC = targetCalories * carbPerc;
+
+  const proteinG = Math.round(proteinC / 4);
+  const fatG = Math.round(fatC / 9);
+  const carbG = Math.round(carbC / 4);
+
+  return {
+    daily_calories: targetCalories,
+    macros_percent: { protein: 30, fats: 25, carbs: 45 },
+    meals: [
+      { name: 'Breakfast', description: 'Oatmeal with fruit', calories: Math.round(targetCalories * 0.3), protein: Math.round(proteinG * 0.3), carbs: Math.round(carbG * 0.3), fats: Math.round(fatG * 0.3) },
+      { name: 'Lunch', description: 'Grilled chicken + rice', calories: Math.round(targetCalories * 0.35), protein: Math.round(proteinG * 0.35), carbs: Math.round(carbG * 0.35), fats: Math.round(fatG * 0.35) },
+      { name: 'Dinner', description: 'Fish + vegetables', calories: Math.round(targetCalories * 0.3), protein: Math.round(proteinG * 0.3), carbs: Math.round(carbG * 0.3), fats: Math.round(fatG * 0.3) },
+      { name: 'Snack', description: 'Yogurt or nuts', calories: Math.round(targetCalories * 0.05), protein: Math.round(proteinG * 0.05), carbs: Math.round(carbG * 0.05), fats: Math.round(fatG * 0.05) }
+    ]
+  };
+}
+
+// ==================== PUBLIC ROUTE ====================
+app.get('/', (req, res) => res.send('Backend online and CSV loaded'));
+
+// ==================== PROTECTED ROUTES ====================
 app.get('/api/profile', requireAuth, (req, res) => {
-  // return profile (in real app use req.user.id)
-  res.json(userProfile);
-});
-
-app.get('/api/workout-plan', requireAuth, (req, res) => {
-  res.json(workoutPlan);
-});
-
-app.get('/api/meal-plan', requireAuth, (req, res) => {
-  res.json(mealPlan);
+  res.json({ message: 'Profile endpoint', user: req.user });
 });
 
 app.post('/api/generate-plan', requireAuth, (req, res) => {
-  const { age, weight, height, gender, goal, activityLevel } = req.body || {};
-  // update stored profile and dummy-generate plans (replace with AI logic)
-  userProfile = { age, weight, height, gender, goal, activityLevel };
-  // Simple generation heuristic example:
-  workoutPlan = {
-    name: "Generated Plan",
-    exercises: [
-      { name: "Jumping Jacks", description: "Warmup", sets: 3, reps: 30, type: "cardio" },
-      { name: "Bodyweight Squats", description: "Leg strength", sets: 4, reps: 12, type: "strength" }
-    ]
-  };
-  mealPlan = {
-    daily_calories: 2000,
-    meals: [
-      { name: "Breakfast", description: "Yogurt + fruit", calories: 350, protein: 15, carbs: 50, fats: 8 },
-      { name: "Lunch", description: "Chicken salad", calories: 600, protein: 45, carbs: 40, fats: 18 },
-      { name: "Dinner", description: "Vegetable stir fry + rice", calories: 550, protein: 20, carbs: 80, fats: 12 }
-    ]
-  };
-  res.json({ message: 'Plan generated (demo)' });
+  const { age, weight, height, gender, goal, activityLevel, focus_area } = req.body || {};
+  if (!age || !weight || !height) {
+    return res.status(400).json({ error: 'Missing user parameters' });
+  }
+
+  const bmi = computeBMI(weight, height);
+  const intensity = selectIntensity({ goal }, bmi);
+  const plan = pickWorkoutPlan(intensity, focus_area);
+  const maintenance = estimateCalories(weight, height, age, gender, activityLevel);
+  let targetCalories = maintenance;
+  if ((goal || '').toLowerCase().includes('lose')) targetCalories -= 500;
+  else if ((goal || '').toLowerCase().includes('gain')) targetCalories += 300;
+  targetCalories = Math.max(1200, Math.round(targetCalories));
+
+  const mealPlan = generateMealPlan(targetCalories);
+
+  return res.json({
+    profile: { age, weight, height, gender, goal, activityLevel, bmi },
+    workout_plan: plan,
+    meal_plan: mealPlan,
+    generated_at: new Date().toISOString()
+  });
 });
 
-// start server
+// ==================== START SERVER ====================
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => console.log(`✅ Backend running on http://localhost:${PORT}`));
