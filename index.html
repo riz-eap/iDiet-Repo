@@ -46,6 +46,10 @@
     .input{width:100%;padding:8px;border-radius:8px;border:1px solid #ddd}
     .select{width:100%;padding:8px;border-radius:8px;border:1px solid #ddd}
     .edit-toggle{cursor:pointer;color:var(--primary);font-weight:700}
+    /* AI accuracy box styles */
+    .accuracy-box{background:#fff;border-radius:10px;padding:12px;text-align:center;box-shadow:0 6px 12px rgba(0,0,0,0.06);margin-top:12px}
+    .accuracy-label{font-size:0.85rem;color:var(--muted);margin-bottom:6px}
+    .accuracy-value{font-size:1.4rem;font-weight:800;color:var(--secondary)}
     @media (max-width:900px){.dashboard{grid-template-columns:1fr}}
   </style>
 </head>
@@ -88,6 +92,13 @@
           <div class="card-header"><h3>API Status</h3></div>
           <div id="api-status" class="placeholder">Checking...</div>
         </div>
+
+        <!-- NEW: AI Accuracy box (small side widget) -->
+        <div id="ai-accuracy-card" class="accuracy-box" aria-live="polite" title="Estimated AI accuracy">
+          <div class="accuracy-label">AI Model Accuracy (estimated)</div>
+          <div id="ai-accuracy" class="accuracy-value">--%</div>
+          <div class="small" style="margin-top:6px;color:var(--muted)">This is an estimate shown for demonstration</div>
+        </div>
       </div>
 
       <div>
@@ -121,6 +132,7 @@
     const saveBtn = document.getElementById('save-btn');
     const editToggle = document.getElementById('edit-toggle');
     const messageArea = document.getElementById('message-area');
+    const aiAccuracyEl = document.getElementById('ai-accuracy');
 
     // safe JSON parse for localStorage
     function safeParse(key) {
@@ -239,9 +251,8 @@
         </div>
       `;
 
-      // wire up inputs if in edit mode (no-op if disabled)
+      // show/hide Save button
       if (!disabled) {
-        // show Save button
         saveBtn.style.display = 'inline-block';
       } else {
         saveBtn.style.display = 'none';
@@ -429,6 +440,33 @@
       }
     }
 
+    // ---------- AI accuracy functions (new) ----------
+    function randomAccuracy() {
+      // returns a string like "92.37"
+      const min = 85.0, max = 95.0;
+      const v = Math.random() * (max - min) + min;
+      return v.toFixed(2);
+    }
+
+    function renderAccuracy() {
+      if (!aiAccuracyEl) return;
+      const val = randomAccuracy();
+      aiAccuracyEl.textContent = val + '%';
+      // subtle color shift depending on value
+      const num = parseFloat(val);
+      if (num >= 92.5) aiAccuracyEl.style.color = '#0b6b3a';
+      else if (num >= 89) aiAccuracyEl.style.color = 'var(--secondary)';
+      else aiAccuracyEl.style.color = '#a84b3b';
+    }
+
+    // initialize accuracy and refresh periodically
+    let aiAccuracyInterval = null;
+    function startAccuracyUpdates() {
+      renderAccuracy();
+      // update every 15 seconds
+      aiAccuracyInterval = setInterval(renderAccuracy, 15000);
+    }
+
     // init
     document.addEventListener('DOMContentLoaded', async () => {
       // initial UI
@@ -441,6 +479,7 @@
       await checkBackend();
       await fetchWorkoutPlan();
       await fetchMealPlan();
+      startAccuracyUpdates();
     });
 
     // helper check backend (reuse)
