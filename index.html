@@ -43,6 +43,9 @@
     .message.ok{background:#e6ffef;color:#065f46}
     .actions .btn-generate{flex:1;background:var(--accent);color:white;padding:12px;border-radius:8px}
     .actions .btn-logout{background:#f94144;color:#fff;padding:8px 12px;border-radius:8px}
+    .input{width:100%;padding:8px;border-radius:8px;border:1px solid #ddd}
+    .select{width:100%;padding:8px;border-radius:8px;border:1px solid #ddd}
+    .edit-toggle{cursor:pointer;color:var(--primary);font-weight:700}
     @media (max-width:900px){.dashboard{grid-template-columns:1fr}}
   </style>
 </head>
@@ -55,7 +58,7 @@
       </div>
 
       <div class="profile-top" id="profile-top">
-        <!-- profile injected by JS -->
+        <!-- inserted by JS -->
       </div>
     </header>
 
@@ -66,23 +69,24 @@
     <main class="dashboard">
       <div>
         <div class="card">
-          <div class="card-header"><h3>User Profile</h3></div>
+          <div class="card-header">
+            <h3>User Profile</h3>
+            <span class="edit-toggle" id="edit-toggle">✏️ Edit</span>
+          </div>
           <div id="profile-card">
+            <!-- user fields inserted by JS -->
             <div class="placeholder">Loading profile...</div>
+          </div>
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button id="save-btn" class="btn" style="background:var(--success);color:#fff;display:none">Save Changes</button>
+            <button id="generate-btn" class="btn btn-generate">Generate Plan</button>
+            <button id="logout-btn" class="btn btn-logout">Logout</button>
           </div>
         </div>
 
         <div class="card" style="margin-top:12px">
           <div class="card-header"><h3>API Status</h3></div>
           <div id="api-status" class="placeholder">Checking...</div>
-        </div>
-
-        <div class="card" style="margin-top:12px">
-          <div class="card-header"><h3>Actions</h3></div>
-          <div class="actions">
-            <button id="generate-btn" class="btn btn-generate">Generate New Plan</button>
-            <button id="logout-btn" class="btn btn-logout" title="Logout">Logout</button>
-          </div>
         </div>
       </div>
 
@@ -103,7 +107,7 @@
   </div>
 
   <script>
-    // API base — override by defining window.API_BASE_URL before loading this HTML if needed
+    // API base — override by defining window.API_BASE_URL before loading
     const API_BASE_URL = window.API_BASE_URL || 'https://idiet-repo.onrender.com';
 
     // DOM refs
@@ -114,6 +118,8 @@
     const mealPlanEl = document.getElementById('meal-plan');
     const generateBtn = document.getElementById('generate-btn');
     const logoutBtn = document.getElementById('logout-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const editToggle = document.getElementById('edit-toggle');
     const messageArea = document.getElementById('message-area');
 
     // safe JSON parse for localStorage
@@ -151,7 +157,7 @@
       }
     }
 
-    // render profile top right
+    // profile top rendering
     function renderProfileTop(user) {
       profileTopEl.innerHTML = '';
       const avatar = document.createElement('div');
@@ -167,21 +173,82 @@
       profileTopEl.appendChild(actions);
     }
 
-    // render profile card inputs (read-only display)
-    function renderProfileCard(p) {
+    // Render user profile card (inputs when editMode true)
+    let editMode = false;
+    let currentProfile = safeParse('afp_profile') || {
+      name: 'Guest User',
+      email: '',
+      age: 28,
+      weight: 70,
+      height: 175,
+      gender: 'male',
+      goal: 'maintain',
+      activityLevel: 'moderate'
+    };
+
+    function renderProfileCard(profile) {
+      currentProfile = { ...currentProfile, ...profile };
+      const disabled = !editMode;
       profileCardEl.innerHTML = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div><label class="small">Age</label><div>${p.age}</div></div>
-          <div><label class="small">Weight (kg)</label><div>${p.weight}</div></div>
-          <div><label class="small">Height (cm)</label><div>${p.height}</div></div>
-          <div><label class="small">Gender</label><div>${p.gender}</div></div>
-          <div><label class="small">Goal</label><div>${p.goal}</div></div>
-          <div><label class="small">Activity Level</label><div>${p.activityLevel}</div></div>
+          <div>
+            <label class="small">Name</label>
+            <input id="pf-name" class="input" value="${escapeHtml(currentProfile.name || '')}" ${disabled ? 'disabled': ''}/>
+          </div>
+          <div>
+            <label class="small">Email</label>
+            <input id="pf-email" class="input" value="${escapeHtml(currentProfile.email || '')}" ${disabled ? 'disabled': ''}/>
+          </div>
+          <div>
+            <label class="small">Age</label>
+            <input id="pf-age" class="input" type="number" value="${escapeHtml(currentProfile.age || 28)}" min="10" max="100" ${disabled ? 'disabled': ''}/>
+          </div>
+          <div>
+            <label class="small">Weight (kg)</label>
+            <input id="pf-weight" class="input" type="number" step="0.1" value="${escapeHtml(currentProfile.weight || 70)}" ${disabled ? 'disabled': ''}/>
+          </div>
+          <div>
+            <label class="small">Height (cm)</label>
+            <input id="pf-height" class="input" type="number" value="${escapeHtml(currentProfile.height || 175)}" ${disabled ? 'disabled': ''}/>
+          </div>
+          <div>
+            <label class="small">Gender</label>
+            <select id="pf-gender" class="select" ${disabled ? 'disabled': ''}>
+              <option value="male" ${currentProfile.gender==='male'?'selected':''}>Male</option>
+              <option value="female" ${currentProfile.gender==='female'?'selected':''}>Female</option>
+              <option value="other" ${currentProfile.gender==='other'?'selected':''}>Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="small">Goal</label>
+            <select id="pf-goal" class="select" ${disabled ? 'disabled': ''}>
+              <option value="lose" ${currentProfile.goal==='lose'?'selected':''}>Lose Weight</option>
+              <option value="maintain" ${currentProfile.goal==='maintain'?'selected':''}>Maintain</option>
+              <option value="gain" ${currentProfile.goal==='gain'?'selected':''}>Gain Muscle</option>
+            </select>
+          </div>
+          <div>
+            <label class="small">Activity Level</label>
+            <select id="pf-activity" class="select" ${disabled ? 'disabled': ''}>
+              <option value="sedentary" ${currentProfile.activityLevel==='sedentary'?'selected':''}>Sedentary</option>
+              <option value="light" ${currentProfile.activityLevel==='light'?'selected':''}>Light</option>
+              <option value="moderate" ${currentProfile.activityLevel==='moderate'?'selected':''}>Moderate</option>
+              <option value="active" ${currentProfile.activityLevel==='active'?'selected':''}>Active</option>
+            </select>
+          </div>
         </div>
       `;
+
+      // wire up inputs if in edit mode (no-op if disabled)
+      if (!disabled) {
+        // show Save button
+        saveBtn.style.display = 'inline-block';
+      } else {
+        saveBtn.style.display = 'none';
+      }
     }
 
-    // Render workout plan with sets/reps/duration/calories
+    // render workout plan
     function renderWorkout(plan) {
       if (!plan || !plan.exercises || plan.exercises.length === 0) {
         workoutPlanEl.innerHTML = `<div class="placeholder">Your personalized workout plan will appear here</div>`; return;
@@ -204,12 +271,12 @@
       workoutPlanEl.innerHTML = html;
     }
 
-    // Render meal plan with macros
+    // render meal plan
     function renderMeal(plan) {
       if (!plan || !plan.meals || plan.meals.length === 0) {
         mealPlanEl.innerHTML = `<div class="placeholder">Your personalized meal plan will appear here</div>`; return;
       }
-      let html = `<div style="text-align:center" class="small" style="margin-bottom:12px">Daily Calories: <strong>${plan.daily_calories || ''} kcal</strong></div>`;
+      let html = `<div style="text-align:center;margin-bottom:12px" class="small">Daily Calories: <strong>${plan.daily_calories || ''} kcal</strong></div>`;
       plan.meals.forEach(meal => {
         html += `<div class="meal">
           <h4>${escapeHtml(meal.name)}</h4>
@@ -225,13 +292,11 @@
       mealPlanEl.innerHTML = html;
     }
 
-    // escape helper
     function escapeHtml(s) {
       if (s == null) return '';
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // API calls
     async function checkBackend() {
       apiStatusEl.textContent = 'Checking...';
       const r = await safeFetchJson(`${API_BASE_URL}/`);
@@ -245,13 +310,12 @@
     }
 
     async function fetchUserProfile() {
-      // prefer localStorage profile if present
       const local = safeParse('afp_profile');
       if (local) { renderProfileCard(local); renderProfileTop(local); return; }
       const r = await safeFetchJson(`${API_BASE_URL}/api/profile`);
-      if (r.error) { renderProfileCard({ age:28,weight:70,height:175,gender:'male',goal:'maintain',activityLevel:'moderate'}); renderProfileTop({name:'Guest'}); return; }
+      if (r.error) { renderProfileCard(currentProfile); renderProfileTop(currentProfile); return; }
       if (r.json) { renderProfileCard(r.json); renderProfileTop(r.json); localStorage.setItem('afp_profile', JSON.stringify(r.json)); }
-      else { renderProfileCard({ age:28,weight:70,height:175,gender:'male',goal:'maintain',activityLevel:'moderate'}); renderProfileTop({name:'Guest'}); }
+      else { renderProfileCard(currentProfile); renderProfileTop(currentProfile); }
     }
 
     async function fetchWorkoutPlan() {
@@ -266,10 +330,8 @@
       mealPlanEl.innerHTML = `<div class="placeholder">Loading meal plan…</div>`;
       const r = await safeFetchJson(`${API_BASE_URL}/api/meal-plan`);
       if (r.error) { mealPlanEl.innerHTML = `<div class="placeholder">Error loading meal plan</div>`; return; }
-      if (r.json && (r.json.meals || r.json.daily_calories || r.json.meals)) {
-        // If meal plan includes daily_calories top-level, pass it through
-        if (r.json.daily_calories || r.json.meals) renderMeal(r.json);
-        else renderMeal({ meals: [] });
+      if (r.json && (r.json.meals || r.json.daily_calories)) {
+        renderMeal(r.json);
       } else {
         renderMeal({ meals: [] });
       }
@@ -279,31 +341,19 @@
       try {
         generateBtn.disabled = true;
         generateBtn.textContent = 'Generating…';
-        // read profile from localStorage if present
-        const local = safeParse('afp_profile') || {};
-        const body = {
-          age: local.age || 28,
-          weight: local.weight || 70,
-          height: local.height || 175,
-          gender: local.gender || 'male',
-          goal: local.goal || 'maintain',
-          activityLevel: local.activityLevel || 'moderate'
-        };
+        // read profile from inputs if available (if editMode true, they may be editing)
+        const pf = readProfileFromInputs() || safeParse('afp_profile') || currentProfile;
         const r = await safeFetchJson(`${API_BASE_URL}/api/generate-plan`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
+          body: JSON.stringify({
+            age: pf.age, weight: pf.weight, height: pf.height, gender: pf.gender, goal: pf.goal, activityLevel: pf.activityLevel
+          })
         });
-        if (r.error) {
-          showMessage('Generate failed: network error', 'error');
-          return;
-        }
+        if (r.error) { showMessage('Generate failed: network error', 'error'); return; }
         if (!r.ok) {
-          // server returned message/html: show text
-          showMessage(`Generate failed: ${r.status} ${r.text ? '- ' + r.text : ''}`, 'error');
-          return;
+          showMessage(`Generate failed: ${r.status} ${r.text? '- '+r.text: ''}`, 'error'); return;
         }
-        // r.json contains workout_plan and meal_plan per backend design
         const json = r.json || {};
         if (json.profile) { localStorage.setItem('afp_profile', JSON.stringify(json.profile)); renderProfileCard(json.profile); renderProfileTop(json.profile); }
         if (json.workout_plan) renderWorkout(json.workout_plan);
@@ -311,32 +361,100 @@
         showMessage('Plan generated', 'ok');
       } finally {
         generateBtn.disabled = false;
-        generateBtn.textContent = 'Generate New Plan';
+        generateBtn.textContent = 'Generate Plan';
       }
     }
 
-    // logout
-    function logout() {
-      localStorage.removeItem('afp_token'); localStorage.removeItem('afp_user'); localStorage.removeItem('afp_profile');
-      renderProfileTop({ name: 'Guest' });
-      renderProfileCard({ age:28,weight:70,height:175,gender:'male',goal:'maintain',activityLevel:'moderate' });
-      showMessage('Logged out', 'ok');
+    // Save profile: validate and persist
+    function readProfileFromInputs() {
+      // if inputs exist, read them, else return null
+      const el = document.getElementById('pf-age');
+      if (!el) return null;
+      const p = {
+        name: document.getElementById('pf-name')?.value || currentProfile.name,
+        email: document.getElementById('pf-email')?.value || currentProfile.email,
+        age: Number(document.getElementById('pf-age')?.value) || currentProfile.age,
+        weight: Number(document.getElementById('pf-weight')?.value) || currentProfile.weight,
+        height: Number(document.getElementById('pf-height')?.value) || currentProfile.height,
+        gender: document.getElementById('pf-gender')?.value || currentProfile.gender,
+        goal: document.getElementById('pf-goal')?.value || currentProfile.goal,
+        activityLevel: document.getElementById('pf-activity')?.value || currentProfile.activityLevel
+      };
+      return p;
+    }
+
+    function saveProfile() {
+      const p = readProfileFromInputs();
+      // basic validation
+      if (!p || !p.age || !p.weight || !p.height) { showMessage('Please fill age, weight and height', 'error'); return; }
+      localStorage.setItem('afp_profile', JSON.stringify(p));
+      currentProfile = p;
+      editMode = false;
+      renderProfileCard(p);
+      renderProfileTop(p);
+      showMessage('Profile saved', 'ok');
+    }
+
+    // Edit toggle
+    editToggle.addEventListener('click', () => {
+      editMode = !editMode;
+      renderProfileCard(currentProfile);
+    });
+
+    // Save button
+    saveBtn.addEventListener('click', saveProfile);
+
+    // Logout: clear state and redirect to login.html
+    logoutBtn.addEventListener('click', () => {
+      localStorage.removeItem('afp_token');
+      localStorage.removeItem('afp_user');
+      localStorage.removeItem('afp_profile');
+      // redirect to login page
+      window.location.href = 'login.html';
+    });
+
+    // wire generate
+    generateBtn.addEventListener('click', generateNewPlan);
+
+    // safe fetch
+    async function safeFetchJson(url, opts={}) {
+      try {
+        const res = await fetch(url, opts);
+        const text = await res.text();
+        let json = null;
+        try { json = text ? JSON.parse(text) : null; } catch (e) { json = null; }
+        return { ok: res.ok, status: res.status, json, text };
+      } catch (err) {
+        return { error: err.message || String(err) };
+      }
     }
 
     // init
     document.addEventListener('DOMContentLoaded', async () => {
-      // wire buttons
-      generateBtn.addEventListener('click', generateNewPlan);
-      logoutBtn.addEventListener('click', logout);
-
-      // initial render
-      const storedUser = safeParse('afp_user');
-      renderProfileTop(storedUser || { name: storedUser?.name || 'Guest' });
+      // initial UI
+      const stored = safeParse('afp_profile');
+      if (stored) {
+        currentProfile = { ...currentProfile, ...stored };
+      }
+      renderProfileCard(currentProfile);
+      renderProfileTop(currentProfile);
       await checkBackend();
-      await fetchUserProfile();
       await fetchWorkoutPlan();
       await fetchMealPlan();
     });
+
+    // helper check backend (reuse)
+    async function checkBackend() {
+      apiStatusEl.textContent = 'Checking...';
+      const r = await safeFetchJson(`${API_BASE_URL}/`);
+      if (r.error) {
+        apiStatusEl.textContent = 'Offline';
+        apiStatusEl.style.color = 'red';
+        return;
+      }
+      apiStatusEl.textContent = r.ok ? 'Online (Connected)' : `HTTP ${r.status}`;
+      apiStatusEl.style.color = r.ok ? 'green' : 'orange';
+    }
   </script>
 </body>
 </html>
