@@ -1,25 +1,28 @@
-// server.js — FINAL INLINE VERSION (no CSV, fully self-contained)
-// ES module backend for AI Diet Planner
-
+// ✅ FINAL FIXED SERVER.JS (NO 404s, FULLY SELF-CONTAINED)
 import express from "express";
 import cors from "cors";
 
 const app = express();
-
-// -------------------- CORS --------------------
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
 app.use(express.json());
 
-// -------------------- AUTH --------------------
+// ===================== CORS =====================
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
+
+// ===================== AUTH (DEMO) =====================
 const DEV_BYPASS_TOKEN = "dev-bypass-token";
 
 app.post("/api/auth/login", (req, res) => {
   const { email, password } = req.body || {};
   if (email === "test@example.com" && password === "TestPassword123") {
-    return res.json({ token: DEV_BYPASS_TOKEN, user: { id: 1, name: "Test User", email } });
+    return res.json({
+      token: DEV_BYPASS_TOKEN,
+      user: { id: 1, name: "Test User", email },
+    });
   }
   return res.status(401).json({ error: "Invalid credentials" });
 });
@@ -28,35 +31,35 @@ function requireAuth(req, res, next) {
   const auth = req.headers.authorization || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth;
   if (token === DEV_BYPASS_TOKEN) {
-    req.user = { id: 1, email: "test@example.com" };
+    req.user = { id: 1, name: "Test User", email: "test@example.com" };
     return next();
   }
   return res.status(401).json({ error: "Unauthorized" });
 }
 
-// -------------------- WORKOUT DATABASE --------------------
-// 2000 sample workouts (trimmed to representative data for readability here).
-// Replace with your real 2000 datapoints if you have them ready.
+// ===================== FAKE WORKOUT DATABASE =====================
 const WORKOUTS = [];
 const intensities = ["light", "moderate", "intense"];
 const types = ["cardio", "strength", "core", "mobility", "balance"];
+
 for (let i = 1; i <= 2000; i++) {
   const intensity = intensities[Math.floor(Math.random() * intensities.length)];
   const type = types[Math.floor(Math.random() * types.length)];
   const duration = Math.floor(Math.random() * 30) + 10; // 10–40 mins
-  const calories = Math.floor(duration * (intensity === "intense" ? 10 : intensity === "moderate" ? 8 : 5));
+  const calories =
+    Math.floor(duration * (intensity === "intense" ? 10 : intensity === "moderate" ? 8 : 5));
   WORKOUTS.push({
     id: i,
     name: `${type.toUpperCase()} Workout ${i}`,
-    description: `${intensity} ${type} routine focused on endurance and stamina`,
+    description: `${intensity} ${type} routine for endurance and stamina`,
     type,
     intensity,
     duration,
-    calories
+    calories,
   });
 }
 
-// -------------------- HELPERS --------------------
+// ===================== HELPERS =====================
 function computeBMI(weight, height_cm) {
   const h = height_cm / 100;
   if (!h) return 0;
@@ -76,8 +79,8 @@ function selectIntensity(goal, bmi) {
 }
 
 function pickWorkouts(intensity, count = 5) {
-  const filtered = WORKOUTS.filter(w => w.intensity === intensity);
-  if (filtered.length === 0) return [];
+  const filtered = WORKOUTS.filter((w) => w.intensity === intensity);
+  if (filtered.length === 0) return WORKOUTS.slice(0, count);
   const chosen = [];
   for (let i = 0; i < count; i++) {
     const rand = filtered[Math.floor(Math.random() * filtered.length)];
@@ -100,28 +103,45 @@ function generateMealPlan(targetCalories) {
     { name: "Breakfast", description: "Oatmeal with banana", portion: 0.3 },
     { name: "Lunch", description: "Grilled chicken with rice", portion: 0.35 },
     { name: "Dinner", description: "Fish and vegetables", portion: 0.25 },
-    { name: "Snack", description: "Greek yogurt or nuts", portion: 0.1 }
+    { name: "Snack", description: "Greek yogurt or nuts", portion: 0.1 },
   ];
   return {
     daily_calories: targetCalories,
-    meals: meals.map(m => ({
+    meals: meals.map((m) => ({
       ...m,
-      calories: Math.round(targetCalories * m.portion)
-    }))
+      calories: Math.round(targetCalories * m.portion),
+    })),
   };
 }
 
-// -------------------- IN-MEMORY LAST STATE --------------------
+// ===================== IN-MEMORY STATE =====================
 let LAST_GENERATED = {
   profile: null,
   workout_plan: null,
   meal_plan: null,
-  generated_at: null
+  generated_at: null,
 };
 
-// -------------------- ROUTES --------------------
-app.get("/", (req, res) => res.send("✅ AI Diet Planner backend running with 2000 in-memory workouts"));
+// ===================== ROUTES =====================
+app.get("/", (req, res) =>
+  res.send("✅ AI Diet Planner backend online (with 2000 in-memory workouts)")
+);
 
+// ---- New route for /api/profile ----
+app.get("/api/profile", (req, res) => {
+  const defaultProfile = {
+    name: "Test User",
+    age: 28,
+    weight: 70,
+    height: 175,
+    gender: "male",
+    goal: "maintain",
+    activityLevel: "moderate",
+  };
+  res.json(LAST_GENERATED.profile || defaultProfile);
+});
+
+// ---- Generate Plan ----
 app.post("/api/generate-plan", requireAuth, (req, res) => {
   try {
     const { age, weight, height, gender, goal, activityLevel } = req.body || {};
@@ -145,12 +165,12 @@ app.post("/api/generate-plan", requireAuth, (req, res) => {
       profile: { age, weight, height, gender, goal, activityLevel, bmi },
       workout_plan: { intensity, workouts },
       meal_plan: mealPlan,
-      generated_at: new Date().toISOString()
+      generated_at: new Date().toISOString(),
     };
 
     return res.json({
       message: "Plan generated",
-      ...LAST_GENERATED
+      ...LAST_GENERATED,
     });
   } catch (err) {
     console.error("Error generating plan:", err);
@@ -158,20 +178,20 @@ app.post("/api/generate-plan", requireAuth, (req, res) => {
   }
 });
 
-// Public GET endpoints for frontend (no auth required)
+// ---- GET workout & meal plan ----
 app.get("/api/workout-plan", (req, res) => {
   if (LAST_GENERATED.workout_plan) return res.json(LAST_GENERATED.workout_plan);
-  return res.status(404).json({ error: "No workout plan generated yet" });
+  return res.json({ message: "No workout plan yet — generate one first" });
 });
 
 app.get("/api/meal-plan", (req, res) => {
   if (LAST_GENERATED.meal_plan) return res.json(LAST_GENERATED.meal_plan);
-  return res.status(404).json({ error: "No meal plan generated yet" });
+  return res.json({ message: "No meal plan yet — generate one first" });
 });
 
-// -------------------- START SERVER --------------------
+// ===================== SERVER START =====================
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running at http://localhost:${PORT}`);
+  console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`💪 Loaded ${WORKOUTS.length} in-memory workouts`);
 });
